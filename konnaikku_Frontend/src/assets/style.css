@@ -1,0 +1,243 @@
+body {
+  font-family: 'Kanit', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+h1, h2, h3 {
+  font-family: 'Kanit', sans-serif;
+}
+
+/* ===== Navbar ===== */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #ddd;
+  padding: 8px 16px;
+  font-family: 'Kanit', sans-serif;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  height: 50px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.logo:hover {
+  transform: scale(1.05);
+}
+
+.navbar-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.location {
+  display: flex;
+  align-items: center;
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.location select {
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #f5f5f5;
+  border-radius: 6px;
+  overflow: hidden;
+  padding-left: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.search-bar input {
+  border: none;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  width: 250px;
+}
+
+.search-bar input::placeholder {
+  color: #999;
+}
+
+.search-btn {
+  background: #00AEEF;
+  border: none;
+  color: white;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.search-btn:hover {
+  background: #008bb5;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+}
+
+.login-btn {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 6px 14px;
+  color: #ffffff;
+  background: #00AEEF;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.login-btn:hover {
+  background: #008bb5;
+}
+
+/* ===== Category Bar ===== */
+.category-bar {
+  display: flex;
+  overflow-x: auto;
+  gap: 24px;
+  padding: 16px;
+  background: #f7f7f7;
+  border-bottom: 1px solid #eee;
+}
+
+.category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.category-item:hover {
+  transform: translateY(-2px);
+}
+
+.category-item .icon {
+  background: #f4f4f4;
+  padding: 12px;
+  border-radius: 50%;
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+/* ===== Section Title ===== */
+.section-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 16px;
+  color: #333;
+}
+
+/* ===== Tabs ===== */
+.tabs {
+  display: flex;
+  gap: 16px;
+  margin: 0 16px 16px;
+}
+
+.tab {
+  cursor: pointer;
+  font-size: 14px;
+  color: gray;
+  padding-bottom: 4px;
+}
+.tab.active {
+  color: #00AEEF;
+  font-weight: bold;
+  border-bottom: 2px solid #00AEEF;
+}
+
+/* ===== Card Grid ===== */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+}
+
+.card-img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+}
+
+.card-body {
+  padding: 12px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+}
+
+.card-sub {
+  font-size: 13px;
+  color: gray;
+  margin: 4px 0;
+}
+
+.rating {
+  background: #ff4d4f;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 6px;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 36px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rating i {
+  font-size: 12px;
+  color: rgb(255, 255, 255); /* ดาวสีทอง */
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .navbar-center {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .search-bar input {
+    width: 180px;
+  }
+}
