@@ -1,78 +1,99 @@
 <template>
   <footer class="footer-wrapper">
     <div class="footer-container max-w-7xl mx-auto py-12 px-6">
+
       <!-- Top Section -->
       <div class="flex flex-col md:flex-row md:justify-between gap-10">
-        <!-- Left: Logo -->
+
+        <!-- Logo -->
         <div class="flex flex-col items-center md:items-start gap-5">
-          <img src="@/assets/images/logos/konnai_logo_2.png" alt="Konnai KKU Logo" class="w-32" />
+          <img
+            src="@/assets/images/logos/konnai_logo_2.png"
+            alt="Konnai KKU Logo"
+            class="w-32"
+          />
         </div>
 
-        <!-- Right: Link Columns -->
+        <!-- Link Columns -->
         <div class="footer-grid text-center md:text-left flex-1">
-          <!-- สำหรับผู้ใช้ -->
+
           <div>
             <h4>สำหรับผู้ใช้</h4>
             <ul>
-              <li><a href="#">เกี่ยวกับ Konnai</a></li>
+              <li>
+                <router-link to="/about">เกี่ยวกับ Konnai</router-link>
+              </li>
             </ul>
           </div>
 
-          <!-- สำหรับร้านค้า -->
           <div>
             <h4>สำหรับร้านค้า</h4>
             <ul>
-              <li><a href="#">แจ้งเป็นเจ้าของร้าน</a></li>
-              <li><a href="#">ลงโฆษณากับเรา</a></li>
-              <li><a href="#">บทความการตลาด</a></li>
+              <li><router-link to="/claim-business">แจ้งเป็นเจ้าของร้าน</router-link></li>
+              <li><router-link to="/advertise">ลงโฆษณากับเรา</router-link></li>
+              <li><router-link to="/marketing">บทความการตลาด</router-link></li>
             </ul>
           </div>
 
-          <!-- สำหรับสื่อ -->
           <div>
             <h4>สำหรับสื่อ</h4>
             <ul>
-              <li><a href="#">ข่าวสาร</a></li>
-              <li><a href="#">กิจกรรม & Event</a></li>
+              <li><router-link to="/news">ข่าวสาร</router-link></li>
+              <li><router-link to="/events">กิจกรรม & Event</router-link></li>
             </ul>
           </div>
 
-          <!-- เกี่ยวกับเรา -->
           <div>
             <h4>เกี่ยวกับเรา</h4>
             <ul>
-              <li><a href="#">ประวัติโครงการ</a></li>
-              <li><a href="#">ติดต่อเรา</a></li>
-              <li><a href="#">ร่วมงานกับเรา</a></li>
-              <li><a href="#">ศูนย์ช่วยเหลือ</a></li>
+              <li><router-link to="/history">ประวัติโครงการ</router-link></li>
+              <li><router-link to="/contact">ติดต่อเรา</router-link></li>
+              <li><router-link to="/careers">ร่วมงานกับเรา</router-link></li>
+              <li><router-link to="/help">ศูนย์ช่วยเหลือ</router-link></li>
             </ul>
           </div>
+
         </div>
       </div>
 
-      <!-- Bottom Section -->
-      <div class="bottom">
+      <!-- Bottom -->
+      <div class="bottom flex flex-col md:flex-row justify-between items-center gap-4 mt-10">
+
         <p>
           © {{ year }} Konnai KKU. All rights reserved.
-          <a href="#">Terms & Conditions</a> |
-          <a href="#">Privacy Policy</a>
+          <router-link to="/terms">Terms & Conditions</router-link> |
+          <router-link to="/privacy">Privacy Policy</router-link>
         </p>
 
-        <div class="social-icons flex gap-5 mt-3 md:mt-0">
-          <a href="#"><i class="fab fa-facebook-f"></i></a>
-          <a href="#"><i class="fab fa-twitter"></i></a>
-          <a href="#"><i class="fab fa-instagram"></i></a>
-          <a href="#"><i class="fab fa-youtube"></i></a>
-          <a href="#"><i class="fab fa-line"></i></a>
+        <div class="social-icons flex gap-5">
+          <a
+            v-for="social in socials"
+            :key="social.icon"
+            :href="social.link"
+            target="_blank"
+          >
+            <i :class="social.icon"></i>
+          </a>
         </div>
+
       </div>
+
     </div>
   </footer>
 </template>
 
 <script setup>
-import { ref } from "vue";
-const year = ref(new Date().getFullYear());
+import { computed } from "vue"
+
+const year = computed(() => new Date().getFullYear())
+
+const socials = [
+  { icon: "fab fa-facebook-f", link: "#" },
+  { icon: "fab fa-twitter", link: "#" },
+  { icon: "fab fa-instagram", link: "#" },
+  { icon: "fab fa-youtube", link: "#" },
+  { icon: "fab fa-line", link: "#" }
+]
 </script>
 
 <style scoped>

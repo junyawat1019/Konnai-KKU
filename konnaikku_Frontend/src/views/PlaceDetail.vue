@@ -148,121 +148,167 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import axios from "axios";
+
 import DefaultLayout from "@/layouts/DefaultLayout.vue";
 import ReviewCard from "@/components/ReviewCard.vue";
 import AddReview from "@/components/AddReview.vue";
-import {
-  doc,
-  getDoc,
-  collection,
-  onSnapshot,
-  setDoc,
-  deleteDoc,
-} from "firebase/firestore";
-import { db, auth } from "@/firebase";
 
 const route = useRoute();
 const router = useRouter();
+
 const placeId = route.params.id;
 
 const place = ref(null);
 const reviews = ref([]);
-const filterRating = ref(0); // 0 = all
+
+const filterRating = ref(0);
 const reviewsToShow = ref(7);
+
 const addReviewRef = ref(null);
 
-// favorite
 const currentUserId = ref(null);
 const isFavorited = ref(false);
 
-// ฟีเจอร์ PhotoView: กดเฉพาะ overlay +N
-const openPhotoViewer = (index) => {
-  router.push({ name: "PhotoView", params: { id: placeId, index } });
-};
+/* ======================
+   Fetch Place
+====================== */
 
-const goToEditPage = () => {
-  router.push(`/edit-place/${placeId}`);
-};
+const fetchPlace = async () => {
+  try {
+    const res = await axios.get(`http://localhost:8080/api/places/${placeId}`);
 
-// คำนวณรีวิวตาม filter
-const filteredReviews = computed(() => {
-  if (filterRating.value === 0) return reviews.value;
-  return reviews.value.filter((r) => r.rating === filterRating.value);
-});
-const displayedReviews = computed(() =>
-  filteredReviews.value.slice(0, reviewsToShow.value)
-);
-
-// Google Map Link
-const getGoogleMapLink = (lat, lng) => {
-  if (!lat || !lng) return "#";
-  return `https://www.google.com/maps?q=${lat},${lng}&hl=th`;
-};
-const goToGoogleMaps = () => {
-  if (place.value?.location) {
-    window.open(
-      getGoogleMapLink(place.value.location.lat, place.value.location.lng),
-      "_blank"
-    );
+    place.value = res.data;
+  } catch (err) {
+    console.error("fetch place error", err);
   }
 };
 
-// scroll ไปยัง AddReview
-const scrollToReview = () => {
-  nextTick(() => {
-    addReviewRef.value?.$el.scrollIntoView({ behavior: "smooth" });
+/* ======================
+   Fetch Reviews
+====================== */
+
+const fetchReviews = async () => {
+  try {
+    const res = await axios.get(
+      `http://localhost:8080/api/reviews/place/${placeId}`,
+    );
+
+    reviews.value = res.data;
+  } catch (err) {
+    console.error("fetch reviews error", err);
+  }
+};
+
+/* ======================
+   Reviews Filter
+====================== */
+
+const filteredReviews = computed(() => {
+  if (filterRating.value === 0) return reviews.value;
+
+  return reviews.value.filter((r) => r.rating === filterRating.value);
+});
+
+const displayedReviews = computed(() =>
+  filteredReviews.value.slice(0, reviewsToShow.value),
+);
+
+/* ======================
+   Google Map
+====================== */
+
+const getGoogleMapLink = (lat, lng) => {
+  if (!lat || !lng) return "#";
+  return `https://www.google.com/maps?q=${lat},${lng}`;
+};
+
+const goToGoogleMaps = () => {
+  if (!place.value?.location) return;
+
+  window.open(
+    getGoogleMapLink(place.value.location.lat, place.value.location.lng),
+    "_blank",
+  );
+};
+
+/* ======================
+   Favorite
+====================== */
+
+const checkIfFavorited = async () => {
+  if (!currentUserId.value) return;
+
+  const res = await axios.get(
+    `http://localhost:8080/api/favorites/${currentUserId.value}/${placeId}`,
+  );
+
+  isFavorited.value = res.data.favorited;
+};
+
+const toggleFavorite = async () => {
+  if (!currentUserId.value) {
+    alert("กรุณาเข้าสู่ระบบก่อน");
+    return;
+  }
+
+  try {
+    if (isFavorited.value) {
+      await axios.delete(
+        `http://localhost:8080/api/favorites/${currentUserId.value}/${placeId}`,
+      );
+
+      isFavorited.value = false;
+    } else {
+      await axios.post("http://localhost:8080/api/favorites", {
+        userId: currentUserId.value,
+        placeId,
+      });
+
+      isFavorited.value = true;
+    }
+  } catch (err) {
+    console.error("favorite error", err);
+  }
+};
+
+/* ======================
+   Photo Viewer
+====================== */
+
+const openPhotoViewer = (index) => {
+  router.push({
+    name: "PhotoView",
+    params: { id: placeId, index },
   });
 };
 
-// แสดงรีวิวทั้งหมด
+/* ======================
+   Review Scroll
+====================== */
+
+const scrollToReview = () => {
+  nextTick(() => {
+    addReviewRef.value?.$el.scrollIntoView({
+      behavior: "smooth",
+    });
+  });
+};
+
+/* ======================
+   Show All Reviews
+====================== */
+
 const showAllReviews = () => {
   reviewsToShow.value = filteredReviews.value.length;
 };
 
-// fetch place
-const fetchPlace = async () => {
-  const docRef = doc(db, "places", placeId);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) place.value = { id: docSnap.id, ...docSnap.data() };
-};
+/* ======================
+   Price Label
+====================== */
 
-// รีวิว realtime
-let unsubscribeReviews = null;
-const fetchReviewsRealtime = () => {
-  if (unsubscribeReviews) unsubscribeReviews();
-  const reviewsRef = collection(db, "places", placeId, "reviews");
-  unsubscribeReviews = onSnapshot(reviewsRef, (snapshot) => {
-    const loadedReviews = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    loadedReviews.sort(
-      (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-    );
-    reviews.value = loadedReviews;
-  });
-};
-
-// favorite
-const checkIfFavorited = async () => {
-  if (!currentUserId.value) return;
-  const favRef = doc(db, "users", currentUserId.value, "favorites", placeId);
-  const favSnap = await getDoc(favRef);
-  isFavorited.value = favSnap.exists();
-};
-const toggleFavorite = async () => {
-  if (!currentUserId.value) return alert("กรุณาเข้าสู่ระบบก่อน");
-  const favRef = doc(db, "users", currentUserId.value, "favorites", placeId);
-  if (isFavorited.value) await deleteDoc(favRef);
-  else
-    await setDoc(favRef, {
-      placeId,
-      name: place.value.name || "",
-      addedAt: new Date(),
-    });
-  isFavorited.value = !isFavorited.value;
-};
-
-// rating label
 const getPriceLabel = (level) => {
   switch (level) {
     case 1:
@@ -280,22 +326,28 @@ const getPriceLabel = (level) => {
   }
 };
 
-// เมื่อมีรีวิวใหม่
+/* ======================
+   Review Added
+====================== */
+
 const onReviewAdded = () => {
+  fetchReviews();
+
   reviewsToShow.value = 7;
-  scrollToReview();
 };
 
+/* ======================
+   Mounted
+====================== */
+
 onMounted(() => {
+  currentUserId.value = localStorage.getItem("userId");
+
   fetchPlace();
-  fetchReviewsRealtime();
-  auth.onAuthStateChanged((user) => {
-    if (user) currentUserId.value = user.uid;
-    checkIfFavorited();
-  });
-});
-onUnmounted(() => {
-  if (unsubscribeReviews) unsubscribeReviews();
+
+  fetchReviews();
+
+  checkIfFavorited();
 });
 </script>
 
@@ -322,7 +374,9 @@ onUnmounted(() => {
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  transition:
+    transform 0.4s ease,
+    box-shadow 0.4s ease;
 }
 
 .main-image-wrapper:hover {
@@ -351,7 +405,9 @@ onUnmounted(() => {
   border-radius: 12px;
   cursor: pointer;
   background-color: #f4f4f4;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 .side-image-wrapper:hover {
   transform: scale(1.05);

@@ -12,6 +12,7 @@
 
     <!-- Center -->
     <div class="navbar-center">
+
       <!-- Location -->
       <div class="location">
         <select v-model="selectedLocation" @change="changeLocation">
@@ -24,240 +25,126 @@
         </select>
       </div>
 
-      <!-- Search Bar -->
-      <div class="search-bar hide-on-mobile">
+      <!-- Search -->
+      <div class="search-bar">
         <input
+          v-model="searchQuery"
           type="text"
           placeholder="ค้นหาร้านอาหาร, โรงแรม, ที่เที่ยว..."
-          v-model="searchQuery"
-          @input="onSearchInput"
-          @focus="showDropdown"
-          @blur="hideDropdown"
+          @input="searchPlaces"
         />
         <button @click="search" class="search-btn">ค้นหา</button>
       </div>
+
     </div>
 
     <!-- Right -->
     <div class="navbar-right">
+
       <template v-if="user">
-        <!-- Profile Button -->
-        <div class="profile-button hide-on-mobile" @click="goProfile">
-          <img
-            :src="photoURL || defaultAvatar"
-            alt="Profile"
-            class="profile-icon"
-          />
-          <span class="username">{{ user.displayName || "ผู้ใช้" }}</span>
+        <div class="profile-button" @click="goProfile">
+          <img :src="user.photoURL || defaultAvatar" class="profile-icon"/>
+          <span>{{ user.displayName }}</span>
         </div>
 
-        <!-- Hamburger Menu -->
-        <div class="dropdown-button" @click.stop="toggleDropdown">
-          <i class="fas fa-bars"></i>
-          <div v-if="dropdownOpen" class="dropdown-panel">
-            <div class="dropdown-header">
-              <img
-                :src="photoURL || defaultAvatar"
-                class="dropdown-avatar"
-                alt="User"
-              />
-              <div class="user-info">
-                <strong>{{ user.displayName || "ผู้ใช้" }}</strong>
-                <p class="email">{{ user.email }}</p>
-              </div>
-            </div>
-
-            <button class="view-profile" @click="goProfile">
-              ดูโปรไฟล์ของฉัน »
-            </button>
-
-            <div class="dropdown-section">
-              <button>ที่บันทึกไว้</button>
-              <button>ข้อความ</button>
-              <button>ตั้งค่า</button>
-            </div>
-
-            <div class="dropdown-footer">
-              <button class="logout" @click="logout">ออกจากระบบ</button>
-            </div>
-          </div>
-        </div>
+        <button @click="logout" class="logut">ออกจากระบบ</button>
       </template>
 
       <template v-else>
-        <button class="login-btn" @click="goLogin">เข้าสู่ระบบ</button>
+        <button @click="goLogin" class="login-btn">เข้าสู่ระบบ</button>
       </template>
+
     </div>
   </nav>
 
-  <transition name="dropdown-fade">
+  <!-- Search Dropdown -->
+  <div v-if="searchResults.length" class="search-dropdown">
     <div
-      v-if="searchQuery.trim() && showResults"
-      class="search-dropdown"
-      :style="{
-        top: dropdownPosition.top + 'px',
-        left: dropdownPosition.left + 'px',
-        width: dropdownPosition.width + 'px',
-      }"
+      v-for="item in searchResults"
+      :key="item.id"
+      class="dropdown-item"
+      @click="goToPlace(item.id)"
     >
-      <div v-if="searchResults.length">
-        <div
-          v-for="item in searchResults"
-          :key="item.id"
-          class="dropdown-item"
-          @mousedown.prevent="selectItem(item)"
-        >
-          {{ item.name }}
-          <small v-if="item.locationTags">({{ item.locationTags }})</small>
-        </div>
-      </div>
-      <div v-else class="dropdown-item no-result">ไม่พบสถานที่</div>
+      {{ item.name }}
     </div>
-  </transition>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick, defineEmits } from "vue";
-import { auth, db } from "@/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import { useRouter } from "vue-router";
-import defaultAvatarImage from "@/assets/images/default-avatar.png";
+import { ref, onMounted } from "vue"
+import { useRouter } from "vue-router"
+import axios from "axios"
 
-const router = useRouter();
+const router = useRouter()
 
-// ----- User / Profile -----
-const user = ref(null);
-const photoURL = ref(defaultAvatarImage);
-const defaultAvatar = defaultAvatarImage;
+const API = "http://localhost:8080/api"
 
-// ----- Navbar State -----
-const selectedLocation = ref("ทั้งหมด");
-const searchQuery = ref("");
-const menuOpen = ref(false);
-const dropdownOpen = ref(false);
-const searchResults = ref([]);
-const showResults = ref(false);
+// user
+const user = ref(null)
+const defaultAvatar = "/default-avatar.png"
 
-const emit = defineEmits(["updateLocation"]);
+// search
+const searchQuery = ref("")
+const searchResults = ref([])
 
-// ----- Search Dropdown Position -----
-const dropdownPosition = ref({ top: 0, left: 0, width: 0 });
+// location
+const selectedLocation = ref("ทั้งหมด")
 
-const updateDropdownPosition = async () => {
-  await nextTick();
-  const inputEl = document.querySelector(".search-bar input");
-  if (inputEl) {
-    const rect = inputEl.getBoundingClientRect();
-    dropdownPosition.value = {
-      top: rect.bottom, // fixed อิง viewport โดยตรง
-      left: rect.left,
-      width: rect.width,
-    };
-  }
-};
+// load user profile
+const fetchUser = async () => {
+  const token = localStorage.getItem("token")
+  if (!token) return
 
-const handleScroll = () => {
-  if (showResults.value) updateDropdownPosition();
-};
-
-// ----- Show / Hide Dropdown -----
-const showDropdown = async () => {
-  if (searchQuery.value.trim()) {
-    await updateDropdownPosition();
-    showResults.value = true;
-  }
-};
-
-const hideDropdown = () => {
-  // หน่วงนิดเพื่อให้คลิกเลือกได้ก่อน blur
-  setTimeout(() => (showResults.value = false), 200);
-};
-
-// ----- ค้นหาใน Firestore -----
-const onSearchInput = async () => {
-  const queryText = searchQuery.value.trim().toLowerCase();
   try {
-    const snapshot = await getDocs(collection(db, "places"));
-    searchResults.value = snapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .filter((item) => item.name.toLowerCase().includes(queryText));
+    const res = await axios.get(`${API}/users/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
 
-    showResults.value = queryText.length > 0;
-    if (showResults.value) await updateDropdownPosition();
-  } catch (err) {
-    console.error("Error fetching search results:", err);
+    user.value = res.data
+  } catch {
+    localStorage.removeItem("token")
   }
-};
+}
 
-const selectItem = (item) => {
-  searchQuery.value = item.name;
-  showResults.value = false;
-  router.push(`/place/${item.id}`);
-};
+// search place
+const searchPlaces = async () => {
+  if (!searchQuery.value) {
+    searchResults.value = []
+    return
+  }
 
+  const res = await axios.get(`${API}/places/search?q=${searchQuery.value}`)
+  searchResults.value = res.data
+}
+
+// go to place
+const goToPlace = (id) => {
+  searchResults.value = []
+  router.push(`/place/${id}`)
+}
+
+// search button
 const search = () => {
-  if (searchResults.value.length > 0) {
-    router.push(`/place/${searchResults.value[0].id}`);
-  } else {
-    alert("ไม่พบผลลัพธ์");
-  }
-};
+  if (searchResults.value.length)
+    router.push(`/place/${searchResults.value[0].id}`)
+}
 
-// ----- Navbar / Profile -----
-const toggleMenu = () => (menuOpen.value = !menuOpen.value);
-const toggleDropdown = () => (dropdownOpen.value = !dropdownOpen.value);
-const closeDropdown = () => (dropdownOpen.value = false);
+// logout
+const logout = () => {
+  localStorage.removeItem("token")
+  user.value = null
+  router.push("/")
+}
 
-const goHome = () => router.push("/");
-const goLogin = () => router.push("/login");
-const goProfile = () => {
-  dropdownOpen.value = false;
-  router.push("/me");
-};
+const goHome = () => router.push("/")
+const goLogin = () => router.push("/login")
+const goProfile = () => router.push("/me")
 
-// ----- Location Change -----
 const changeLocation = () => {
-  emit("updateLocation", selectedLocation.value);
-};
+  router.push(`/?location=${selectedLocation.value}`)
+}
 
-// ----- Logout -----
-const logout = async () => {
-  try {
-    await signOut(auth);
-    user.value = null;
-    dropdownOpen.value = false;
-    router.push("/");
-  } catch (err) {
-    console.error("Error signing out:", err);
-  }
-};
-
-// ----- Auth Listener -----
-onMounted(() => {
-  onAuthStateChanged(auth, async (u) => {
-    user.value = u;
-    if (u) {
-      const userDoc = await getDoc(doc(db, "users", u.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        photoURL.value = data.photoURL || u.photoURL || defaultAvatar;
-      } else {
-        photoURL.value = u.photoURL || defaultAvatar;
-      }
-    }
-  });
-
-  window.addEventListener("click", closeDropdown);
-  window.addEventListener("scroll", handleScroll);
-  window.addEventListener("resize", handleScroll);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener("click", closeDropdown);
-  window.removeEventListener("scroll", handleScroll);
-  window.removeEventListener("resize", handleScroll);
-});
+onMounted(fetchUser)
 </script>
 
 <style scoped>

@@ -84,15 +84,17 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/firebase";
 import DefaultLayout from "@/layouts/DefaultLayout.vue";
 import PlaceCard from "@/components/PlaceCard.vue";
 import { useRouter } from "vue-router";
+import axios from "axios";
 
 const router = useRouter();
 
-/* Slider Section */
+/* ==============================
+   Slider
+============================== */
+
 const sliderImages = [
   {
     url: "https://www.lemon8-app.com/seo/image?item_id=7398129850919272961&index=0",
@@ -110,157 +112,157 @@ const sliderImages = [
 
 const currentSlide = ref(0);
 let sliderTimer = null;
-const nextSlide = () =>
-  (currentSlide.value = (currentSlide.value + 1) % sliderImages.length);
-const prevSlide = () =>
-  (currentSlide.value =
-    (currentSlide.value - 1 + sliderImages.length) % sliderImages.length);
-const goToSlide = (index) => (currentSlide.value = index);
+
+const nextSlide = () => {
+  currentSlide.value = (currentSlide.value + 1) % sliderImages.length;
+};
+
+const prevSlide = () => {
+  currentSlide.value =
+    (currentSlide.value - 1 + sliderImages.length) % sliderImages.length;
+};
+
+const goToSlide = (index) => {
+  currentSlide.value = index;
+};
+
 const pauseSlider = () => clearInterval(sliderTimer);
+
 const resumeSlider = () => {
   clearInterval(sliderTimer);
   sliderTimer = setInterval(nextSlide, 5000);
 };
 
-/* Category Bar */
+/* ==============================
+   Category
+============================== */
+
 const typeOptions = [
-  {
-    value: "restaurant",
-    label: "ร้านอาหาร",
-    icon: "https://img.wongnai.com/p/1920x0/2022/03/17/f72e4d7c3e184914b9d0363145342b91.jpg",
-  },
-  {
-    value: "apartment",
-    label: "อพาร์ตเมนต์",
-    icon: "https://img.wongnai.com/p/1920x0/2022/03/17/85539409bd964df8b5b9b3d0d42e0655.jpg",
-  },
-  {
-    value: "hotel",
-    label: "โรงแรม",
-    icon: "https://img.wongnai.com/p/1920x0/2022/03/17/85539409bd964df8b5b9b3d0d42e0655.jpg",
-  },
-  {
-    value: "tourist",
-    label: "ที่เที่ยว",
-    icon: "https://img.wongnai.com/p/1920x0/2022/03/17/2c5274011a82414ebdd9cc3f737fb9ed.jpg",
-  },
-  {
-    value: "cafe",
-    label: "คาเฟ่",
-    icon: "https://img.wongnai.com/p/1920x0/2022/03/17/c32a2d8a041345e18b62d94762545c9f.jpg",
-  },
-  {
-    value: "entertainment",
-    label: "บาร์/ผับ",
-    icon: "https://img.wongnai.com/p/1920x0/2022/03/17/f72e4d7c3e184914b9d0363145342b91.jpg",
-  },
-  {
-    value: "services",
-    label: "เพิ่มเติม",
-    icon: "https://img.wongnai.com/p/1920x0/2022/03/17/d76a55790ee8451e985657e727cd687c.jpg",
-  },
+  { value: "restaurant", label: "ร้านอาหาร", icon: "/icons/restaurant.png" },
+  { value: "cafe", label: "คาเฟ่", icon: "/icons/cafe.png" },
+  { value: "hotel", label: "โรงแรม", icon: "/icons/hotel.png" },
+  { value: "tourist", label: "ที่เที่ยว", icon: "/icons/travel.png" },
+  { value: "apartment", label: "อพาร์ตเมนต์", icon: "/icons/apartment.png" },
+  { value: "entertainment", label: "บาร์/ผับ", icon: "/icons/bar.png" },
 ];
 
-/* State */
-const places = ref([]);
-const loadingPlaces = ref(true);
 const activeCategory = ref("");
+
+const selectCategory = (category) => {
+  activeCategory.value = category;
+  router.push({ name: "Place", query: { category } });
+};
+
+/* ==============================
+   Tabs
+============================== */
+
 const activeTab = ref("popular");
+
 const tabs = [
   { id: "popular", label: "ยอดนิยม" },
   { id: "trending", label: "ใหม่มาแรง" },
 ];
-// สร้าง state สำหรับ location ที่เลือก
+
+/* ==============================
+   Location
+============================== */
+
 const selectedLocation = ref("ทั้งหมด");
 
-// ฟังก์ชันสำหรับรับ event จาก Navbar
 const updateLocation = (location) => {
   selectedLocation.value = location;
 };
 
-/* Category Select */
-const selectCategory = (id) => {
-  activeCategory.value = id;
-  router.push({ name: "Place", query: { category: id } });
-};
+/* ==============================
+   Places State
+============================== */
 
-/* Fetch Places */
+const places = ref([]);
+const loadingPlaces = ref(false);
+const errorMessage = ref("");
+
+/* ==============================
+   Fetch Places (จาก Backend API)
+============================== */
+
 const fetchPlaces = async () => {
+  loadingPlaces.value = true;
+
   try {
-    const snapshot = await getDocs(collection(db, "places"));
-    places.value = snapshot.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        name: data.name || "",
-        description: data.description || "",
-        imageUrls: data.imageUrls?.length
-          ? data.imageUrls
-          : data.imageUrl
-          ? [data.imageUrl]
-          : [],
-        categoryName: data.categoryName || data.type || "ไม่ระบุหมวด",
-        type: data.type || "",
-        location: data.location || { name: "ไม่ระบุ" },
-        locationTags: data.locationTags || [], // แก้ตรงนี้
-        averageRating: data.averageRating || 0,
-        reviewCount: data.reviewCount || 0,
-        tags: data.tags || [],
-        createdAt: data.createdAt?.toDate
-          ? data.createdAt.toDate()
-          : new Date(),
-      };
-    });
+    const res = await axios.get("http://localhost:8080/api/places");
+
+    places.value = res.data.map((place) => ({
+      id: place.id,
+      name: place.name,
+      description: place.description,
+      imageUrls: place.imageUrls || [],
+      categoryName: place.categoryName,
+      type: place.type,
+      locationTags: place.locationTags || [],
+      averageRating: place.averageRating || 0,
+      reviewCount: place.reviewCount || 0,
+      tags: place.tags || [],
+      createdAt: place.createdAt ? new Date(place.createdAt) : new Date(),
+    }));
   } catch (error) {
-    console.error("Error fetching places:", error);
+    console.error("Fetch places error:", error);
+    errorMessage.value = "โหลดข้อมูลสถานที่ไม่สำเร็จ";
   } finally {
     loadingPlaces.value = false;
   }
 };
 
-/* Filters */
-const filteredPlaces = computed(() =>
-  activeCategory.value
-    ? places.value.filter((p) => p.type === activeCategory.value)
-    : places.value
-);
+/* ==============================
+   Filters
+============================== */
 
-const filteredPlacesByLocation = computed(() => {
-  if (selectedLocation.value === "ทั้งหมด") return filteredPlaces.value;
+const filteredPlaces = computed(() => {
+  if (!activeCategory.value) return places.value;
 
-  return filteredPlaces.value.filter(
-    (p) => p.locationTags && p.locationTags.includes(selectedLocation.value)
+  return places.value.filter(
+    (place) => place.type === activeCategory.value
   );
 });
 
-const displayedPlaces = computed(() => {
-  const basePlaces = filteredPlacesByLocation.value;
-  if (activeTab.value === "popular") {
-    return basePlaces
-      .slice()
-      .sort((a, b) => b.averageRating - a.averageRating)
-      .slice(0, 8);
-  }
-  if (activeTab.value === "trending") {
-    return basePlaces
-      .slice()
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 8);
-  }
-  return basePlaces.slice(0, 10);
+const filteredByLocation = computed(() => {
+  if (selectedLocation.value === "ทั้งหมด") return filteredPlaces.value;
+
+  return filteredPlaces.value.filter((place) =>
+    place.locationTags?.includes(selectedLocation.value)
+  );
 });
 
-/* Navbar Event */
-const onLocationUpdate = (loc) => {
-  selectedLocation.value = loc;
-};
+/* ==============================
+   Displayed Places
+============================== */
 
-/* View All Button */
+const displayedPlaces = computed(() => {
+  let list = [...filteredByLocation.value];
+
+  if (activeTab.value === "popular") {
+    list.sort((a, b) => b.averageRating - a.averageRating);
+  }
+
+  if (activeTab.value === "trending") {
+    list.sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  return list.slice(0, 8);
+});
+
+/* ==============================
+   Navigation
+============================== */
+
 const goToAllPlaces = () => {
   router.push({ name: "Place" });
 };
 
-/* Slider Lifecycle */
+/* ==============================
+   Lifecycle
+============================== */
+
 onMounted(async () => {
   await fetchPlaces();
   resumeSlider();

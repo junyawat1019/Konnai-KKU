@@ -1,56 +1,98 @@
 <template>
   <div v-if="place" class="place-card" @click="goToDetail">
-    <!-- รูปภาพ -->
+    
+    <!-- Image -->
     <div class="place-img-wrapper">
-      <img :src="place.imageUrls?.[0] || placeholderImage" alt="place" class="place-img" />
+      <img
+        :src="mainImage"
+        alt="place"
+        class="place-img"
+        loading="lazy"
+      />
     </div>
 
-    <!-- ข้อมูล -->
+    <!-- Info -->
     <div class="place-info">
       <h2>{{ place.name || "ไม่มีชื่อร้าน" }}</h2>
-      <p class="category">{{ place.categoryName || "ไม่ระบุหมวด" }}</p>
-      <div class="location-tags" v-if="place.locationTags && place.locationTags.length">
+
+      <p class="category">
+        {{ place.categoryName || "ไม่ระบุหมวด" }}
+      </p>
+
+      <div
+        v-if="place.locationTags"
+        class="location-tags"
+      >
         <strong>บริเวณ:</strong> {{ place.locationTags }}
       </div>
-      <div class="tags" v-if="place.tags?.length">
+
+      <div
+        v-if="place.tags?.length"
+        class="tags"
+      >
         {{ place.tags.join(", ") }}
       </div>
+
       <div class="rating-review">
         <span class="rating">
-          <i class="fa fa-star"></i> {{ (place.averageRating ?? 0).toFixed(1) }}
+          <i class="fa fa star"> </i> {{ rating }}
         </span>
-        <span class="review-count"> ({{ place.reviewCount ?? 0 }} รีวิว) </span>
+
+        <span class="review-count">
+          ({{ reviewCount }} รีวิว)
+        </span>
       </div>
+
     </div>
+
   </div>
 
-  <div v-else class="loading">กำลังโหลดข้อมูล...</div>
+  <div v-else class="loading">
+    กำลังโหลดข้อมูล...
+  </div>
 </template>
 
 <script setup>
-import { useRouter } from "vue-router";
+import { computed } from "vue"
+import { useRouter } from "vue-router"
 
-const props = defineProps({ place: Object });
-const router = useRouter();
+const props = defineProps({
+  place: Object
+})
 
-const placeholderImage = "https://placehold.co/400x300?text=No+Image";
+const router = useRouter()
+
+const placeholderImage =
+  "https://placehold.co/400x300?text=No+Image"
+
+/*
+|--------------------------------------------------------------------------
+| Computed
+|--------------------------------------------------------------------------
+*/
+
+const mainImage = computed(() => {
+  return props.place?.imageUrls?.[0] || placeholderImage
+})
+
+const rating = computed(() => {
+  return Number(props.place?.averageRating || 0).toFixed(1)
+})
+
+const reviewCount = computed(() => {
+  return props.place?.reviewCount || 0
+})
+
+/*
+|--------------------------------------------------------------------------
+| Navigation
+|--------------------------------------------------------------------------
+*/
 
 const goToDetail = () => {
-  if (props.place?.id) {
-    router.push(`/place/${props.place.id}`);
-  }
-};
-
-const getPriceLabel = (level) => {
-  const prices = {
-    1: "0 - 100 บาท",
-    2: "101 - 300 บาท",
-    3: "301 - 500 บาท",
-    4: "501 - 1000 บาท",
-    5: "มากกว่า 1000 บาท"
-  };
-  return prices[level] || "ไม่ระบุราคา";
-};
+  if (!props.place?.id) return
+  router.push(`/place/${props.place.id}`)
+}
 </script>
 
 <style scoped>

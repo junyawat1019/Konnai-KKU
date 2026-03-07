@@ -122,20 +122,11 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { auth, db, storage } from "@/firebase";
-import {
-  onAuthStateChanged,
-  updateProfile,
-  updatePassword,
-} from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import {
-  ref as storageRef,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
+import axios from "axios";
 import DefaultLayout from "@/layouts/DefaultLayout.vue";
 import defaultAvatarImage from "@/assets/images/default-avatar.png";
+
+const API = "http://localhost:8080/api";
 
 const displayName = ref("");
 const gender = ref("");
@@ -150,100 +141,118 @@ const showNewPassword = ref(false);
 const showConfirmPassword = ref(false);
 
 const loading = ref(false);
-const userId = ref("");
 
-onMounted(() => {
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
-    userId.value = user.uid;
+const token = localStorage.getItem("token");
 
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    if (userDoc.exists()) {
-      const data = userDoc.data();
-      displayName.value = data.displayName || user.displayName || "";
-      gender.value = data.gender || "";
-      if (data.birthday?.toDate) {
-        birthday.value = data.birthday.toDate().toISOString().split("T")[0];
-      } else {
-        birthday.value = data.birthday || "";
-      }
-      aboutMe.value = data.aboutMe || "";
-      phoneNumber.value = data.phoneNumber || "";
-      photoURL.value = data.photoURL || defaultAvatarImage;
-    }
-  });
-});
+// โหลดข้อมูลผู้ใช้
+const loadProfile = async () => {
+  try {
+    const res = await axios.get(`${API}/users/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
+    const user = res.data;
+
+    displayName.value = user.displayName || "";
+    gender.value = user.gender || "";
+    birthday.value = user.birthday || "";
+    aboutMe.value = user.aboutMe || "";
+    phoneNumber.value = user.phoneNumber || "";
+    photoURL.value = user.photoURL || defaultAvatarImage;
+
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+onMounted(loadProfile);
+
+// อัปโหลดรูป
 const uploadProfilePhoto = async (event) => {
   const file = event.target.files[0];
-  if (!file || !userId.value) return;
+  if (!file) return;
 
   loading.value = true;
+
   try {
-    const timestamp = Date.now();
-    const extension = file.name.split(".").pop();
-    const fileName = `${userId.value}_${timestamp}.${extension}`;
-    const storageReference = storageRef(storage, `profile_photos/${fileName}`);
+    const formData = new FormData();
+    formData.append("image", file);
 
-    await uploadBytes(storageReference, file);
-    const url = await getDownloadURL(storageReference);
+    const res = await axios.post(`${API}/upload/profile-photo`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data"
+      }
+    });
 
-    await updateProfile(auth.currentUser, { photoURL: url });
-    await updateDoc(doc(db, "users", userId.value), { photoURL: url });
-    photoURL.value = url;
-    alert(" อัปโหลดรูปโปรไฟล์เรียบร้อยแล้ว");
-  } catch (error) {
-    alert("เกิดข้อผิดพลาดในการอัปโหลด: " + error.message);
+    photoURL.value = res.data.url;
+
+    alert("อัปโหลดรูปโปรไฟล์สำเร็จ");
+  } catch (err) {
+    alert("อัปโหลดไม่สำเร็จ");
   } finally {
     loading.value = false;
   }
 };
 
+// บันทึกโปรไฟล์
 const updateProfileData = async () => {
-  if (!userId.value) return;
   if (!displayName.value.trim()) {
     alert("กรุณากรอกชื่อผู้ใช้");
     return;
   }
 
   loading.value = true;
+
   try {
-    await updateProfile(auth.currentUser, { displayName: displayName.value });
+    await axios.put(`${API}/users/me`,
+      {
+        displayName: displayName.value,
+        gender: gender.value,
+        birthday: birthday.value,
+        aboutMe: aboutMe.value,
+        phoneNumber: phoneNumber.value
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-    await updateDoc(doc(db, "users", userId.value), {
-      displayName: displayName.value,
-      gender: gender.value,
-      birthday: birthday.value || "",
-      aboutMe: aboutMe.value,
-      phoneNumber: phoneNumber.value,
-    });
-
-    alert("อัปเดตโปรไฟล์เรียบร้อยแล้ว");
-  } catch (error) {
-    alert("เกิดข้อผิดพลาด: " + error.message);
+    alert("อัปเดตโปรไฟล์เรียบร้อย");
+  } catch (err) {
+    alert("เกิดข้อผิดพลาด");
   } finally {
     loading.value = false;
   }
 };
 
+// เปลี่ยนรหัสผ่าน
 const changePassword = async () => {
   if (newPassword.value.length < 6) {
-    alert("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+    alert("รหัสผ่านต้องอย่างน้อย 6 ตัว");
     return;
   }
+
   if (newPassword.value !== confirmPassword.value) {
-    alert("รหัสผ่านและการยืนยันไม่ตรงกัน");
+    alert("รหัสผ่านไม่ตรงกัน");
     return;
   }
 
   loading.value = true;
+
   try {
-    await updatePassword(auth.currentUser, newPassword.value);
-    alert("เปลี่ยนรหัสผ่านเรียบร้อยแล้ว");
+    await axios.put(`${API}/users/password`,
+      {
+        password: newPassword.value
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    alert("เปลี่ยนรหัสผ่านสำเร็จ");
+
     newPassword.value = "";
     confirmPassword.value = "";
-  } catch (error) {
-    alert("เกิดข้อผิดพลาด: " + error.message);
+
+  } catch (err) {
+    alert("เปลี่ยนรหัสผ่านไม่สำเร็จ");
   } finally {
     loading.value = false;
   }

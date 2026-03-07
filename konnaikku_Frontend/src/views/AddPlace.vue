@@ -75,233 +75,205 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import { db, storage, auth } from "@/firebase";
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-  getDocs,
-} from "firebase/firestore";
-import {
-  ref as storageRef,
-  uploadBytesResumable,
-  getDownloadURL,
-} from "firebase/storage";
+import { ref, onMounted } from "vue"
+import { useRouter } from "vue-router"
+import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import axios from "axios"
 
-const router = useRouter();
+const router = useRouter()
 
-const loading = ref(false);
+const API_URL = "http://localhost:8080/api"
 
-const name = ref("");
-const description = ref("");
-const type = ref("");
-const phoneNumber = ref("");
-const websiteUrl = ref("");
-const address = ref("");
-const district = ref("");
-const province = ref("");
-const lat = ref(null);
-const lng = ref(null);
-const locationTags = ref("");
-const priceLevel = ref("");
-const tagsInput = ref("");
-const imageFiles = ref([]);
-const previewImages = ref([]);
-const categories = ref([]);
+const loading = ref(false)
 
-const fallbackCategories = [
-  { id: "restaurant", name: "ร้านอาหาร" },
-  { id: "cafe", name: "คาเฟ่ & เครื่องดื่ม" },
-  { id: "apartment", name: "หอพัก / อพาร์ตเมนต์" },
-  { id: "hotel", name: "โรงแรม / ที่พัก" },
-  { id: "shopping", name: "แหล่งช็อปปิ้ง" },
-  { id: "tourist", name: "สถานที่ท่องเที่ยว" },
-  { id: "sports", name: "สถานที่ออกกำลังกาย" },
-  { id: "entertainment", name: "บันเทิง & ไลฟ์สไตล์" },
-  { id: "services", name: "บริการต่าง ๆ" },
-];
+const name = ref("")
+const description = ref("")
+const type = ref("")
+const phoneNumber = ref("")
+const websiteUrl = ref("")
+const address = ref("")
+const district = ref("")
+const province = ref("")
+const lat = ref(null)
+const lng = ref(null)
+const locationTags = ref("")
+const priceLevel = ref("")
+const tagsInput = ref("")
+
+const imageFiles = ref([])
+const previewImages = ref([])
+
+const categories = ref([])
 
 const onFileChange = (e) => {
-  const files = Array.from(e.target.files).filter((f) =>
-    f.type.startsWith("image/")
-  );
-  imageFiles.value = files;
-  previewImages.value.forEach(URL.revokeObjectURL);
-  previewImages.value = files.map((f) => URL.createObjectURL(f));
-};
+  const files = Array.from(e.target.files).filter(f => f.type.startsWith("image/"))
+  imageFiles.value = files
+
+  previewImages.value.forEach(URL.revokeObjectURL)
+
+  previewImages.value = files.map(f => URL.createObjectURL(f))
+}
 
 const loadCategories = async () => {
   try {
-    const catSnap = await getDocs(collection(db, "categories"));
-    categories.value = catSnap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    if (categories.value.length === 0) {
-      categories.value = fallbackCategories;
-    }
-  } catch (error) {
-    console.error("ไม่สามารถโหลดหมวดหมู่จาก Firestore:", error);
-    categories.value = fallbackCategories;
+    const res = await axios.get(`${API_URL}/categories`)
+    categories.value = res.data
+  } catch (err) {
+    console.error("โหลดหมวดหมู่ไม่สำเร็จ", err)
   }
-};
-
-const uploadImages = async () => {
-  const urls = [];
-  for (const file of imageFiles.value) {
-    const uniqueFileName = `${Date.now()}_${file.name}`;
-    const imgRef = storageRef(storage, `places/${uniqueFileName}`);
-    const uploadTask = uploadBytesResumable(imgRef, file);
-
-    await new Promise((resolve, reject) => {
-      uploadTask.on("state_changed", null, reject, async () => {
-        const downloadURL = await getDownloadURL(imgRef);
-        urls.push(downloadURL);
-        resolve();
-      });
-    });
-  }
-  return urls;
-};
+}
 
 const addPlace = async () => {
-  if (!auth.currentUser) {
-    alert("กรุณาเข้าสู่ระบบก่อนเพิ่มสถานที่");
-    router.push("/login");
-    return;
-  }
+
   if (!type.value) {
-    alert("กรุณาเลือกประเภทของสถานที่");
-    return;
-  }
-  if (!lat.value || !lng.value) {
-    alert("กรุณาเลือกตำแหน่งบนแผนที่");
-    return;
-  }
-  if (!priceLevel.value) {
-    alert("กรุณาเลือกช่วงราคา");
-    return;
+    alert("กรุณาเลือกประเภทสถานที่")
+    return
   }
 
-  loading.value = true;
+  if (!lat.value || !lng.value) {
+    alert("กรุณาเลือกตำแหน่งบนแผนที่")
+    return
+  }
+
+  loading.value = true
 
   try {
-    const imageUrls = await uploadImages();
 
-    const placeData = {
-      name: name.value,
-      description: description.value,
-      categoryId: type.value,
-      categoryName:
-        categories.value.find((cat) => cat.id === type.value)?.name || "",
-      priceLevel: priceLevel.value,
-      tags: tagsInput.value
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter((tag) => tag),
-      phoneNumber: phoneNumber.value || "",
-      websiteUrl: websiteUrl.value || "",
-      locationTags: locationTags.value,
-      location: {
-        address: address.value,
-        district: district.value,
-        province: province.value,
-        lat: lat.value,
-        lng: lng.value,
-      },
-      imageUrls,
-      averageRating: 0,
-      reviewCount: 0,
-      createdAt: serverTimestamp(),
-      createdBy: auth.currentUser.uid,
-    };
+    const formData = new FormData()
 
-    await addDoc(collection(db, "places"), placeData);
-    alert("เพิ่มสถานที่สำเร็จ!");
-    router.push("/");
+    formData.append("name", name.value)
+    formData.append("description", description.value)
+    formData.append("category_id", type.value)
+    formData.append("price_level", priceLevel.value)
+
+    formData.append("phone_number", phoneNumber.value)
+    formData.append("website_url", websiteUrl.value)
+
+    formData.append("location_tag", locationTags.value)
+
+    formData.append("address", address.value)
+    formData.append("district", district.value)
+    formData.append("province", province.value)
+
+    formData.append("lat", lat.value)
+    formData.append("lng", lng.value)
+
+    imageFiles.value.forEach(file => {
+      formData.append("images", file)
+    })
+
+    const token = localStorage.getItem("token")
+
+    await axios.post(`${API_URL}/places`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data"
+      }
+    })
+
+    alert("เพิ่มสถานที่สำเร็จ")
+
+    router.push("/")
+
   } catch (error) {
-    alert("เกิดข้อผิดพลาด: " + error.message);
+
+    console.error(error)
+    alert("เกิดข้อผิดพลาด")
+
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 onMounted(() => {
-  loadCategories();
+
+  loadCategories()
 
   const initMap = () => {
-    const defaultLatLng = { lat: 13.736717, lng: 100.523186 };
-    const mapInstance = new google.maps.Map(document.getElementById("map"), {
-      center: defaultLatLng,
-      zoom: 6,
-    });
+
+    const defaultLatLng = { lat: 13.736717, lng: 100.523186 }
+
+    const mapInstance = new google.maps.Map(
+      document.getElementById("map"),
+      {
+        center: defaultLatLng,
+        zoom: 6
+      }
+    )
 
     const markerInstance = new google.maps.Marker({
       position: defaultLatLng,
       map: mapInstance,
-      draggable: true,
-    });
+      draggable: true
+    })
 
-    lat.value = defaultLatLng.lat;
-    lng.value = defaultLatLng.lng;
+    lat.value = defaultLatLng.lat
+    lng.value = defaultLatLng.lng
 
     markerInstance.addListener("dragend", () => {
-      const pos = markerInstance.getPosition();
-      lat.value = pos.lat();
-      lng.value = pos.lng();
-    });
+      const pos = markerInstance.getPosition()
+      lat.value = pos.lat()
+      lng.value = pos.lng()
+    })
 
-    const input = document.getElementById("search-box");
-    const searchBox = new google.maps.places.SearchBox(input);
+    const input = document.getElementById("search-box")
+    const searchBox = new google.maps.places.SearchBox(input)
 
-    mapInstance.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+    mapInstance.controls[google.maps.ControlPosition.TOP_LEFT].push(input)
 
     searchBox.addListener("places_changed", () => {
-      const places = searchBox.getPlaces();
-      if (!places || places.length === 0) return;
 
-      const place = places[0];
-      if (!place.geometry) return;
+      const places = searchBox.getPlaces()
 
-      lat.value = place.geometry.location.lat();
-      lng.value = place.geometry.location.lng();
-      address.value = place.formatted_address || place.name;
+      if (!places || places.length === 0) return
 
-      const districtComponent = place.address_components?.find(
-        (c) =>
-          c.types.includes("sublocality_level_1") ||
-          c.types.includes("administrative_area_level_2")
-      );
-      district.value = districtComponent?.long_name || "";
+      const place = places[0]
 
-      mapInstance.setCenter(place.geometry.location);
-      mapInstance.setZoom(16);
+      if (!place.geometry) return
 
-      markerInstance.setPosition(place.geometry.location);
-    });
+      lat.value = place.geometry.location.lat()
+      lng.value = place.geometry.location.lng()
+
+      address.value = place.formatted_address || place.name
+
+      mapInstance.setCenter(place.geometry.location)
+      mapInstance.setZoom(16)
+
+      markerInstance.setPosition(place.geometry.location)
+
+    })
 
     mapInstance.addListener("click", (e) => {
-      lat.value = e.latLng.lat();
-      lng.value = e.latLng.lng();
-      markerInstance.setPosition(e.latLng);
-    });
-  };
+
+      lat.value = e.latLng.lat()
+      lng.value = e.latLng.lng()
+
+      markerInstance.setPosition(e.latLng)
+
+    })
+
+  }
 
   if (window.google) {
-    initMap();
+
+    initMap()
+
   } else {
-    const script = document.createElement("script");
+
+    const script = document.createElement("script")
+
     script.src =
-      "https://maps.googleapis.com/maps/api/js?key=AIzaSyA0o70lTNSC3teBOdcJsNm8cWLDNcjwnYk&libraries=places";
-    script.async = true;
-    script.defer = true;
-    script.onload = initMap;
-    document.head.appendChild(script);
+      "https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAP_API&libraries=places"
+
+    script.async = true
+    script.defer = true
+    script.onload = initMap
+
+    document.head.appendChild(script)
+
   }
-});
+
+})
 </script>
 
 <style scoped>

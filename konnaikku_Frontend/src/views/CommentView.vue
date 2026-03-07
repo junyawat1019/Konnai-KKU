@@ -4,7 +4,11 @@
       <h2>คอมเมนต์</h2>
 
       <div class="add-comment">
-        <textarea v-model="commentText" placeholder="เขียนคอมเมนต์..." rows="3"></textarea>
+        <textarea
+          v-model="commentText"
+          placeholder="เขียนคอมเมนต์..."
+          rows="3"
+        ></textarea>
         <button @click="submitComment" :disabled="loading">
           {{ loading ? "กำลังส่ง..." : "ส่งคอมเมนต์" }}
         </button>
@@ -12,7 +16,10 @@
 
       <div v-if="comments.length">
         <div v-for="c in comments" :key="c.id" class="comment-card">
-          <p><strong>{{ c.username }}</strong> · {{ formatDate(c.createdAt) }}</p>
+          <p>
+            <strong>{{ c.display_name || c.username }}</strong>
+            · {{ formatDate(c.created_at) }}
+          </p>
           <p>{{ c.comment }}</p>
         </div>
       </div>
@@ -26,12 +33,13 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
+import axios from "axios";
 import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "firebase/firestore";
-import { db, auth } from "@/firebase";
 
 const route = useRoute();
-const placeId = route.params.id;
+
+const API_URL = "http://localhost:8080/api";
+
 const reviewId = route.params.reviewId;
 
 const commentText = ref("");
@@ -39,39 +47,55 @@ const comments = ref([]);
 const loading = ref(false);
 
 const fetchComments = async () => {
-  const commentsRef = collection(db, "places", placeId, "reviews", reviewId, "comments");
-  const q = query(commentsRef, orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(q);
-  comments.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  try {
+    const res = await axios.get(`${API_URL}/reviews/${reviewId}/comments`);
+
+    comments.value = res.data;
+  } catch (error) {
+    console.error("โหลดคอมเมนต์ไม่สำเร็จ", error);
+  }
 };
 
 const submitComment = async () => {
-  if (!auth.currentUser) {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
     alert("กรุณาล็อกอินก่อนคอมเมนต์");
     return;
   }
+
   if (!commentText.value.trim()) return;
 
   loading.value = true;
+
   try {
-    await addDoc(collection(db, "places", placeId, "reviews", reviewId, "comments"), {
-      comment: commentText.value,
-      userId: auth.currentUser.uid,
-      username: auth.currentUser.displayName || auth.currentUser.email,
-      createdAt: serverTimestamp(),
-    });
+    await axios.post(
+      `${API_URL}/reviews/${reviewId}/comments`,
+      {
+        comment: commentText.value,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
     commentText.value = "";
-    fetchComments();
+
+    await fetchComments();
   } catch (error) {
-    console.error("Error adding comment:", error);
+    console.error("เพิ่มคอมเมนต์ไม่สำเร็จ", error);
   } finally {
     loading.value = false;
   }
 };
 
-const formatDate = (timestamp) => {
-  if (!timestamp) return "";
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+
   return date.toLocaleString();
 };
 

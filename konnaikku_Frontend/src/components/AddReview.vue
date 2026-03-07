@@ -44,126 +44,100 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { db, auth, storage } from "@/firebase";
-import {
-  collection,
-  addDoc,
-  doc,
-  runTransaction,
-  serverTimestamp,
-  getDoc
-} from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref } from "vue"
+import axios from "axios"
 
-const props = defineProps({ placeId: String });
-const emit = defineEmits(["reviewAdded"]);
+const props = defineProps({
+  placeId: String
+})
 
-const comment = ref("");
-const rating = ref(5);
-const imageFiles = ref([]);
-const imagePreviews = ref([]);
-const loading = ref(false);
-const fileInput = ref(null);
+const emit = defineEmits(["reviewAdded"])
 
-const triggerFileInput = () => fileInput.value.click();
+const comment = ref("")
+const rating = ref(5)
+const imageFiles = ref([])
+const imagePreviews = ref([])
+const loading = ref(false)
+const fileInput = ref(null)
+
+const triggerFileInput = () => {
+  fileInput.value.click()
+}
 
 const onFileChange = (e) => {
-  const files = Array.from(e.target.files);
-  const validFiles = [];
+  const files = Array.from(e.target.files)
+
+  const validFiles = []
 
   for (let file of files) {
+
     if (!file.type.startsWith("image/")) {
-      alert(`${file.name} ไม่ใช่ไฟล์ภาพ`);
-      continue;
+      alert(`${file.name} ไม่ใช่ไฟล์ภาพ`)
+      continue
     }
+
     if (file.size > 5 * 1024 * 1024) {
-      alert(`${file.name} มีขนาดใหญ่เกินไป (ต้องไม่เกิน 5MB)`);
-      continue;
+      alert(`${file.name} เกิน 5MB`)
+      continue
     }
-    validFiles.push(file);
+
+    validFiles.push(file)
   }
 
-  imageFiles.value = validFiles;
-  imagePreviews.value = validFiles.map((file) => URL.createObjectURL(file));
-};
+  imageFiles.value = validFiles
+  imagePreviews.value = validFiles.map(file => URL.createObjectURL(file))
+}
 
 const removeImage = (index) => {
-  imageFiles.value.splice(index, 1);
-  imagePreviews.value.splice(index, 1);
-};
+  imageFiles.value.splice(index, 1)
+  imagePreviews.value.splice(index, 1)
+}
 
 const submitReview = async () => {
-  if (!auth.currentUser) {
-    alert("กรุณาล็อกอินก่อนเขียนรีวิว");
-    return;
-  }
 
   if (!comment.value.trim()) {
-    alert("กรุณาใส่เนื้อหารีวิว");
-    return;
+    alert("กรุณาใส่เนื้อหารีวิว")
+    return
   }
 
-  loading.value = true;
+  loading.value = true
 
   try {
-    const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-    const userData = userDoc.exists() ? userDoc.data() : {};
 
-    const imageUrls = [];
-    for (const file of imageFiles.value) {
-      const imgRef = storageRef(
-        storage,
-        `reviews/${Date.now()}_${file.name}`
-      );
-      await uploadBytes(imgRef, file);
-      const downloadURL = await getDownloadURL(imgRef);
-      imageUrls.push(downloadURL);
-    }
+    const formData = new FormData()
 
-    await addDoc(collection(db, "places", props.placeId, "reviews"), {
-      placeId: props.placeId,
-      userId: auth.currentUser.uid,
-      userDisplayName:
-        userData.displayName || auth.currentUser.email.split("@")[0],
-      userPhotoURL: userData.photoURL || "",
-      rating: rating.value,
-      comment: comment.value,
-      imageUrls: imageUrls,
-      createdAt: serverTimestamp(),
-      likesCount: 0,
-      commentsCount: 0
-    });
+    formData.append("placeId", props.placeId)
+    formData.append("comment", comment.value)
+    formData.append("rating", rating.value)
 
-    const placeRef = doc(db, "places", props.placeId);
-    await runTransaction(db, async (transaction) => {
-      const placeDoc = await transaction.get(placeRef);
-      if (!placeDoc.exists()) throw new Error("ไม่พบสถานที่");
+    imageFiles.value.forEach(file => {
+      formData.append("images", file)
+    })
 
-      const prevCount = placeDoc.data().reviewCount || 0;
-      const prevRating = placeDoc.data().averageRating || 0;
+    await axios.post(
+      "http://localhost:8080/api/reviews",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    )
 
-      const newCount = prevCount + 1;
-      const newAvg = (prevRating * prevCount + rating.value) / newCount;
+    comment.value = ""
+    rating.value = 5
+    imageFiles.value = []
+    imagePreviews.value = []
 
-      transaction.update(placeRef, {
-        reviewCount: newCount,
-        averageRating: newAvg
-      });
-    });
+    emit("reviewAdded")
 
-    comment.value = "";
-    rating.value = 5;
-    imageFiles.value = [];
-    imagePreviews.value = [];
-    emit("reviewAdded");
   } catch (error) {
-    console.error(error);
-    alert("เกิดข้อผิดพลาด: " + error.message);
+    console.error(error)
+    alert("เกิดข้อผิดพลาด")
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 </script>
 
 <style scoped>

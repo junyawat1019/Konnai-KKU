@@ -4,70 +4,97 @@
       <h2>เข้าสู่ระบบ</h2>
 
       <form @submit.prevent="loginUser">
-        <input v-model.trim="email" type="email" placeholder="อีเมล" required />
-        <input v-model.trim="password" type="password" placeholder="รหัสผ่าน" required />
+        <input
+          v-model.trim="email"
+          type="email"
+          placeholder="อีเมล"
+          required
+        />
+
+        <input
+          v-model.trim="password"
+          type="password"
+          placeholder="รหัสผ่าน"
+          required
+        />
+
         <button type="submit" :disabled="loading">
           {{ loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ" }}
         </button>
       </form>
 
-      <div class="divider">หรือ</div>
-
-      <button class="google-btn" @click="loginWithGoogle" :disabled="loading">
-        เข้าสู่ระบบด้วย Google
-      </button>
+      <p v-if="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </p>
 
       <p class="switch-auth">
         ยังไม่มีบัญชีใช่ไหม?
         <router-link to="/register">สมัครสมาชิก</router-link>
       </p>
+
       <p class="switch-auth">
         ลืมรหัสผ่าน?
-        <router-link to="/reset-password">รีเซ็ทรหัสผ่าน</router-link>
+        <router-link to="/reset-password">รีเซ็ตรหัสผ่าน</router-link>
       </p>
-
     </div>
   </DefaultLayout>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { auth } from "@/firebase";
+import { ref } from "vue"
+import { useRouter } from "vue-router"
+import axios from "axios"
+import DefaultLayout from "@/layouts/DefaultLayout.vue"
 
-const email = ref("");
-const password = ref("");
-const loading = ref(false);
-const router = useRouter();
+const router = useRouter()
+
+const email = ref("")
+const password = ref("")
+
+const loading = ref(false)
+const errorMessage = ref("")
+
+const API = "http://localhost:8080/api"
+
+/* =========================
+   Login
+========================= */
 
 const loginUser = async () => {
-  loading.value = true;
-  try {
-    await signInWithEmailAndPassword(auth, email.value, password.value);
-    alert("เข้าสู่ระบบสำเร็จ!");
-    router.push("/");
-  } catch (error) {
-    alert("เกิดข้อผิดพลาด: " + error.message);
-  } finally {
-    loading.value = false;
-  }
-};
 
-const loginWithGoogle = async () => {
-  loading.value = true;
+  if (loading.value) return
+
+  loading.value = true
+  errorMessage.value = ""
+
   try {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
-    alert("เข้าสู่ระบบด้วย Google สำเร็จ!");
-    router.push("/");
+
+    const res = await axios.post(`${API}/auth/login`, {
+      email: email.value,
+      password: password.value
+    })
+
+    const { token, user } = res.data
+
+    localStorage.setItem("token", token)
+    localStorage.setItem("user", JSON.stringify(user))
+
+    router.push("/")
+
   } catch (error) {
-    alert("เกิดข้อผิดพลาด: " + error.message);
+
+    if (error.response) {
+      errorMessage.value = error.response.data.message
+    } else {
+      errorMessage.value = "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"
+    }
+
+    console.error(error)
+
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 </script>
 
 <style scoped>

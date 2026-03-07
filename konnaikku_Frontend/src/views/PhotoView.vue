@@ -1,45 +1,62 @@
 <template>
   <DefaultLayout>
-    <div class="photo-page" v-if="place">
+    <div class="photo-page">
       <button class="back-btn" @click="goBack">กลับ</button>
 
-      <h1 class="place-title">{{ place.name }}</h1>
+      <!-- Loading -->
+      <div v-if="loading" class="loading">กำลังโหลดรูปภาพ...</div>
 
-      <!-- Grid รูปภาพ -->
-      <div class="photo-grid">
-        <img
-          v-for="(url, index) in place.imageUrls"
-          :key="index"
-          :src="url"
-          class="photo-item"
-          @click="openLightbox(index)"
-        />
+      <div v-else-if="place">
+        <h1 class="place-title">
+          {{ place.name }}
+        </h1>
+
+        <!-- Photo Grid -->
+        <div v-if="place.imageUrls?.length" class="photo-grid">
+          <img
+            v-for="(url, index) in place.imageUrls"
+            :key="index"
+            :src="url"
+            class="photo-item"
+            loading="lazy"
+            @click="openLightbox(index)"
+          />
+        </div>
+
+        <div v-else class="no-photo">ไม่มีรูปภาพ</div>
       </div>
 
       <!-- Lightbox -->
       <div v-if="showLightbox" class="lightbox" @click.self="closeLightbox">
         <button class="close-btn" @click="closeLightbox">×</button>
 
-        <!-- ปุ่มเลื่อนภาพ -->
-        <button v-if="hasPrev" class="nav-btn left" @click.stop="prevImage">‹</button>
-        <button v-if="hasNext" class="nav-btn right" @click.stop="nextImage">›</button>
+        <button v-if="hasPrev" class="nav-btn left" @click.stop="prevImage">
+          ‹
+        </button>
 
-        <!-- ภาพใหญ่ -->
+        <button v-if="hasNext" class="nav-btn right" @click.stop="nextImage">
+          ›
+        </button>
+
         <img :src="currentImage" class="lightbox-image" />
 
-        <!-- ปุ่มดาวน์โหลด -->
-        <a :href="currentImage" download class="download-btn" title="ดาวน์โหลดรูป">
-          ดาวน์โหลด
-        </a>
+        <a :href="currentImage" download class="download-btn"> ดาวน์โหลด </a>
+
+        <!-- Image Counter -->
+        <div class="image-counter">
+          {{ currentIndex + 1 }} / {{ place.imageUrls.length }}
+        </div>
       </div>
     </div>
   </DefaultLayout>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
+
 import DefaultLayout from "@/layouts/DefaultLayout.vue";
+
 import { db } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -50,18 +67,47 @@ const placeId = route.params.id;
 const startIndex = Number(route.params.index) || 0;
 
 const place = ref(null);
+const loading = ref(true);
+
 const showLightbox = ref(false);
 const currentIndex = ref(startIndex);
 
+/* =======================
+   Fetch Place
+======================= */
+
 const fetchPlace = async () => {
-  const docRef = doc(db, "places", placeId);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) place.value = { id: docSnap.id, ...docSnap.data() };
+  try {
+    const docRef = doc(db, "places", placeId);
+    const snap = await getDoc(docRef);
+
+    if (snap.exists()) {
+      const data = snap.data();
+
+      place.value = {
+        id: snap.id,
+        name: data.name || "",
+        imageUrls: data.imageUrls || [],
+      };
+
+      if (place.value.imageUrls.length && startIndex >= 0) {
+        showLightbox.value = true;
+      }
+    }
+  } catch (error) {
+    console.error("Fetch place error:", error);
+  } finally {
+    loading.value = false;
+  }
 };
 
-onMounted(fetchPlace);
+/* =======================
+   Navigation
+======================= */
 
-const goBack = () => router.back();
+const goBack = () => {
+  router.back();
+};
 
 const openLightbox = (index) => {
   currentIndex.value = index;
@@ -72,17 +118,53 @@ const closeLightbox = () => {
   showLightbox.value = false;
 };
 
+/* =======================
+   Image Control
+======================= */
+
 const prevImage = () => {
-  if (currentIndex.value > 0) currentIndex.value--;
+  if (currentIndex.value > 0) {
+    currentIndex.value--;
+  }
 };
 
 const nextImage = () => {
-  if (currentIndex.value < place.value.imageUrls.length - 1) currentIndex.value++;
+  if (currentIndex.value < place.value.imageUrls.length - 1) {
+    currentIndex.value++;
+  }
 };
 
-const currentImage = computed(() => place.value?.imageUrls?.[currentIndex.value]);
+const currentImage = computed(
+  () => place.value?.imageUrls?.[currentIndex.value],
+);
+
 const hasPrev = computed(() => currentIndex.value > 0);
-const hasNext = computed(() => currentIndex.value < (place.value?.imageUrls?.length || 0) - 1);
+
+const hasNext = computed(
+  () => currentIndex.value < (place.value?.imageUrls?.length || 0) - 1,
+);
+
+/* =======================
+   Keyboard Navigation
+======================= */
+
+const handleKey = (e) => {
+  if (!showLightbox.value) return;
+
+  if (e.key === "ArrowLeft") prevImage();
+  if (e.key === "ArrowRight") nextImage();
+  if (e.key === "Escape") closeLightbox();
+};
+
+onMounted(() => {
+  fetchPlace();
+
+  window.addEventListener("keydown", handleKey);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("keydown", handleKey);
+});
 </script>
 
 <style scoped>

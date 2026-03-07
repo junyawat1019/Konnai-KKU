@@ -41,86 +41,59 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import axios from "axios";
 import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { auth, db } from "@/firebase";
-import { doc, setDoc } from "firebase/firestore";
+
+const API = "http://localhost:8080/api";
 
 const email = ref("");
 const password = ref("");
 const displayName = ref("");
 const gender = ref("");
 const birthday = ref("");
+
 const loading = ref(false);
 const router = useRouter();
 
 const registerUser = async () => {
+
   if (password.value.length < 6) {
-    alert("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+    alert("รหัสผ่านต้องมีอย่างน้อย 6 ตัว");
     return;
   }
 
   loading.value = true;
+
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
 
-    await updateProfile(userCredential.user, {
-      displayName: displayName.value,
-    });
-
-    await setDoc(doc(db, "users", userCredential.user.uid), {
+    const res = await axios.post(`${API}/auth/register`, {
       displayName: displayName.value,
       email: email.value,
+      password: password.value,
       gender: gender.value,
-      birthday: birthday.value ? new Date(birthday.value) : null,
-      createdAt: new Date(),
-      photoURL: "",
-      aboutMe: "",
-      phoneNumber: "",
-      favorites: [],
-      reviewsCount: 0,
-      followersCount: 0,
-      followingCount: 0,
+      birthday: birthday.value
     });
 
-    alert("สมัครสมาชิกสำเร็จ!");
+    localStorage.setItem("token", res.data.token);
+
+    alert("สมัครสมาชิกสำเร็จ");
+
     router.push("/");
-  } catch (error) {
-    alert("เกิดข้อผิดพลาด: " + error.message);
+
+  } catch (err) {
+
+    alert(err.response?.data?.message || "สมัครสมาชิกไม่สำเร็จ");
+
   } finally {
+
     loading.value = false;
+
   }
+
 };
 
-const registerWithGoogle = async () => {
-  loading.value = true;
-  try {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-
-    if (result._tokenResponse.isNewUser) {
-      await setDoc(doc(db, "users", result.user.uid), {
-        displayName: result.user.displayName || result.user.email.split("@")[0],
-        email: result.user.email,
-        gender: "",
-        birthday: null,
-        createdAt: new Date(),
-        photoURL: result.user.photoURL || "",
-        aboutMe: "",
-        phoneNumber: "",
-        favorites: [],
-        reviewsCount: 0,
-        followersCount: 0,
-        followingCount: 0,
-      });
-    }
-
-    router.push("/");
-  } catch (error) {
-    alert("เกิดข้อผิดพลาด: " + error.message);
-  } finally {
-    loading.value = false;
-  }
+const registerWithGoogle = () => {
+  window.location.href = `${API}/auth/google`;
 };
 </script>
 

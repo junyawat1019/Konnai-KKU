@@ -173,9 +173,9 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { db, auth } from "@/firebase";
+import axios from "axios";
+
 import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import { collection, doc, onSnapshot, getDocs } from "firebase/firestore";
 import defaultAvatarImage from "@/assets/images/default-avatar.png";
 import PlaceCard from "@/components/PlaceCard.vue";
 import ReviewCard from "@/components/ReviewCard.vue";
@@ -183,12 +183,14 @@ import ReviewCard from "@/components/ReviewCard.vue";
 const router = useRouter();
 const route = useRoute();
 
+const API = "http://localhost:8080/api";
+
 // ------------------- User IDs -------------------
 const currentUserId = ref(null);
 const profileUserId = ref(route.params.userId || null);
 
 const isOwnProfile = computed(
-  () => !route.params.userId || route.params.userId === currentUserId.value
+  () => !route.params.userId || route.params.userId === currentUserId.value,
 );
 
 // ------------------- User Info -------------------
@@ -201,7 +203,7 @@ const email = ref("");
 const photoURL = ref(defaultAvatarImage);
 const createdAt = ref(null);
 
-// ------------------- Followers / Following -------------------
+// ------------------- Followers -------------------
 const followersCount = ref(0);
 const followingCount = ref(0);
 const isFollowing = ref(false);
@@ -213,163 +215,102 @@ const recentActivity = ref([]);
 const userReviews = ref([]);
 const userPhotos = ref([]);
 const myPlaces = ref([]);
-
-// ------------------- Favorites -------------------
 const favorites = ref([]);
 
-// ------------------- Functions -------------------
-const formatDate = (timestamp) => {
-  if (!timestamp?.toDate) return "";
-  return timestamp.toDate?.().toLocaleDateString("th-TH", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+// ------------------- Format Date -------------------
+const formatDate = (date) => {
+  if (!date) return "";
+  return new Date(date).toLocaleDateString("th-TH");
 };
 
+// ------------------- Load Profile -------------------
 const loadProfile = async () => {
   const userId = profileUserId.value || currentUserId.value;
   if (!userId) return;
 
-  // ------------------- User Data -------------------
-  const userRef = doc(db, "users", userId);
-  onSnapshot(userRef, (docSnap) => {
-    if (!docSnap.exists()) return;
-    const data = docSnap.data();
-    displayName.value = data.displayName || "";
-    email.value = data.email || "";
-    gender.value = data.gender || "";
-    birthday.value = data.birthday?.toDate
-      ? new Date(data.birthday.toDate()).toLocaleDateString("th-TH", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })
-      : data.birthday || "";
-    aboutMe.value = data.aboutMe || "";
-    phoneNumber.value = data.phoneNumber || "";
+  try {
+    const res = await axios.get(`${API}/users/${userId}`);
+    const data = res.data;
+
+    displayName.value = data.displayName;
+    email.value = data.email;
+    gender.value = data.gender;
+    birthday.value = data.birthday;
+    aboutMe.value = data.aboutMe;
+    phoneNumber.value = data.phoneNumber;
     photoURL.value = data.photoURL || defaultAvatarImage;
-    createdAt.value = data.createdAt || null;
-  });
-
-  // ------------------- Followers / Following -------------------
-  onSnapshot(collection(db, "users", userId, "followers"), (snapshot) => {
-    followersCount.value = snapshot.size;
-    if (currentUserId.value) {
-      isFollowing.value = snapshot.docs.some(
-        (d) => d.id === currentUserId.value
-      );
-    }
-  });
-
-  onSnapshot(collection(db, "users", userId, "following"), (snapshot) => {
-    followingCount.value = snapshot.size;
-  });
-
-  // ------------------- Favorites -------------------
-  const favRef = collection(db, "users", userId, "favorites");
-  onSnapshot(favRef, (snapshot) => {
-    favorites.value = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-  });
-
-  // ------------------- Load Places, Reviews, Photos, Activities -------------------
-  userReviews.value = [];
-  userPhotos.value = [];
-  myPlaces.value = [];
-  const activities = [];
-
-  const placesSnap = await getDocs(collection(db, "places"));
-  for (const placeDoc of placesSnap.docs) {
-    const placeData = placeDoc.data();
-    const placeId = placeDoc.id;
-
-    // My Places
-    if (placeData.createdBy === userId) {
-      myPlaces.value.push({ id: placeId, ...placeData });
-
-      if (placeData.imageUrls?.length) {
-        userPhotos.value.push(
-          ...placeData.imageUrls.map((url) => ({
-            id: placeId + url,
-            url,
-            placeId,
-          }))
-        );
-      }
-
-      activities.push({
-        type: "add_place",
-        placeId,
-        placeName: placeData.name,
-        createdAt: placeData.createdAt,
-      });
-    }
-
-    // Reviews
-    const reviewsSnap = await getDocs(
-      collection(db, "places", placeId, "reviews")
-    );
-    reviewsSnap.forEach((reviewDoc) => {
-      const reviewData = reviewDoc.data();
-      if (reviewData.userId === userId) {
-        userReviews.value.push({ id: reviewDoc.id, placeId, ...reviewData });
-        if (reviewData.imageUrls?.length) {
-          userPhotos.value.push(
-            ...reviewData.imageUrls.map((url) => ({
-              id: reviewDoc.id + url,
-              url,
-              placeId,
-            }))
-          );
-        }
-        activities.push({
-          type: "review",
-          placeId,
-          placeName: placeData.name || "สถานที่",
-          createdAt: reviewData.createdAt,
-        });
-      }
-    });
+    createdAt.value = data.createdAt;
+  } catch (err) {
+    console.error("load profile error", err);
   }
 
-  recentActivity.value = activities
-    .sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis())
-    .slice(0, 10);
+  loadFollowers();
+  loadReviews();
+  loadPlaces();
+  loadFavorites();
 };
 
-// ------------------- Toggle Follow -------------------
+// ------------------- Followers -------------------
+const loadFollowers = async () => {
+  const res = await axios.get(`${API}/users/${profileUserId.value}/followers`);
+
+  followersCount.value = res.data.followersCount;
+  followingCount.value = res.data.followingCount;
+  isFollowing.value = res.data.isFollowing;
+};
+
+// ------------------- Reviews -------------------
+const loadReviews = async () => {
+  const res = await axios.get(`${API}/users/${profileUserId.value}/reviews`);
+
+  userReviews.value = res.data;
+
+  userPhotos.value = res.data
+    .flatMap((r) => r.imageUrls || [])
+    .map((url) => ({
+      url,
+      placeId: r.placeId,
+    }));
+};
+
+// ------------------- Places -------------------
+const loadPlaces = async () => {
+  const res = await axios.get(`${API}/users/${profileUserId.value}/places`);
+
+  myPlaces.value = res.data;
+};
+
+// ------------------- Favorites -------------------
+const loadFavorites = async () => {
+  const res = await axios.get(`${API}/users/${profileUserId.value}/favorites`);
+
+  favorites.value = res.data;
+};
+
+// ------------------- Follow -------------------
 const toggleFollow = async () => {
   if (followLoading.value || isOwnProfile.value) return;
+
   followLoading.value = true;
 
   try {
-    const followerRef = doc(
-      db,
-      "users",
-      profileUserId.value,
-      "followers",
-      currentUserId.value
-    );
-    const followingRef = doc(
-      db,
-      "users",
-      currentUserId.value,
-      "following",
-      profileUserId.value
-    );
-
     if (isFollowing.value) {
-      await followerRef.delete();
-      await followingRef.delete();
+      await axios.delete(
+        `${API}/users/${profileUserId.value}/follow/${currentUserId.value}`,
+      );
+
+      isFollowing.value = false;
+      followersCount.value--;
     } else {
-      await followerRef.set({ userId: currentUserId.value });
-      await followingRef.set({ userId: profileUserId.value });
+      await axios.post(`${API}/users/${profileUserId.value}/follow`, {
+        followerId: currentUserId.value,
+      });
+
+      isFollowing.value = true;
+      followersCount.value++;
     }
   } catch (err) {
-    console.error("Error toggling follow:", err);
+    console.error("follow error", err);
   } finally {
     followLoading.value = false;
   }
@@ -377,46 +318,41 @@ const toggleFollow = async () => {
 
 // ------------------- Navigation -------------------
 const goToEditProfile = () => router.push("/profile/settings");
-const goToProfile = () => router.push(`/profile/${profileUserId.value}`);
-const sendMessage = () => {
-  if (isOwnProfile.value) router.push("/views");
-  else router.push({ path: "/views", query: { userId: profileUserId.value } });
-};
-const shareProfile = () => {
-  const profileLink = `${window.location.origin}/profile/${profileUserId.value}`;
-  navigator.clipboard
-    .writeText(profileLink)
-    .then(() => alert("คัดลอกลิงก์โปรไฟล์เรียบร้อย!"))
-    .catch(() => alert("คัดลอกลิงก์ไม่สำเร็จ"));
-};
 
-// ------------------- Go to Place Detail -------------------
 const goToPlaceDetail = (placeId, reviewId = null) => {
   if (reviewId) {
-    router.push({ path: `/place/${placeId}`, query: { reviewId } });
+    router.push({
+      path: `/place/${placeId}`,
+      query: { reviewId },
+    });
   } else {
     router.push(`/place/${placeId}`);
   }
 };
 
+const shareProfile = () => {
+  const profileLink = `${window.location.origin}/profile/${profileUserId.value}`;
+
+  navigator.clipboard
+    .writeText(profileLink)
+    .then(() => alert("คัดลอกลิงก์โปรไฟล์เรียบร้อย!"));
+};
+
 // ------------------- Lifecycle -------------------
 onMounted(() => {
-  auth.onAuthStateChanged((user) => {
-    if (!user) return router.push("/login");
-    currentUserId.value = user.uid;
+  currentUserId.value = localStorage.getItem("userId");
 
-    if (!route.params.userId) profileUserId.value = user.uid;
-    loadProfile();
-  });
+  if (!route.params.userId) profileUserId.value = currentUserId.value;
+
+  loadProfile();
 });
 
-// watch route change
 watch(
   () => route.params.userId,
   (newId) => {
     profileUserId.value = newId || currentUserId.value;
     loadProfile();
-  }
+  },
 );
 </script>
 
@@ -610,7 +546,9 @@ watch(
   cursor: pointer;
   font-weight: bold;
   color: #555;
-  transition: color 0.2s, border-bottom 0.2s;
+  transition:
+    color 0.2s,
+    border-bottom 0.2s;
   white-space: nowrap;
 }
 .tab-item.active {

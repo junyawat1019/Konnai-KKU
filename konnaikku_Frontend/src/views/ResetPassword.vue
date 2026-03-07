@@ -10,6 +10,7 @@
           placeholder="กรอกอีเมลของคุณ"
           required
         />
+
         <button type="submit" :disabled="loading">
           {{ loading ? "กำลังส่ง..." : "ส่งลิงก์รีเซ็ตรหัสผ่าน" }}
         </button>
@@ -24,27 +25,30 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "@/firebase";
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
+import { ref } from "vue"
+import axios from "axios"
+import DefaultLayout from "@/layouts/DefaultLayout.vue"
 
-const email = ref("");
-const loading = ref(false);
+const email = ref("")
+const loading = ref(false)
 
 const resetPassword = async () => {
-  loading.value = true;
-  try {
-    await sendPasswordResetEmail(auth, email.value);
-    alert("ส่งลิงก์รีเซ็ตรหัสผ่านเรียบร้อยแล้ว โปรดตรวจสอบอีเมลของคุณ");
-    email.value = "";
-  } catch (error) {
-    alert("เกิดข้อผิดพลาด: " + error.message);
-  } finally {
-    loading.value = false;
-  }
-};
+  loading.value = true
 
+  try {
+    await axios.post("http://localhost:8080/api/auth/reset-password", {
+      email: email.value
+    })
+
+    alert("ส่งลิงก์รีเซ็ตรหัสผ่านเรียบร้อยแล้ว")
+    email.value = ""
+
+  } catch (error) {
+    alert(error.response?.data?.message || "เกิดข้อผิดพลาด")
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <style scoped>

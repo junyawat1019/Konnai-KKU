@@ -77,100 +77,89 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import PlaceCard from "@/components/PlaceCard.vue";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/firebase";
+import { ref, onMounted, watch } from "vue"
+import { useRouter, useRoute } from "vue-router"
+import axios from "axios"
 
-const router = useRouter();
-const route = useRoute();
+import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import PlaceCard from "@/components/PlaceCard.vue"
 
-const places = ref([]);
-const filteredPlaces = ref([]);
-const loading = ref(false);
+const router = useRouter()
+const route = useRoute()
 
-const activeCategory = ref("");
-const activePriceLevel = ref("");
-const activeLocationTag = ref("");
-const activeRating = ref("");
+const places = ref([])
+const loading = ref(false)
 
-// Fetch data จาก Firestore
+const activeCategory = ref("")
+const activePriceLevel = ref("")
+const activeLocationTag = ref("")
+const activeRating = ref("")
+
+/* ========================
+   Fetch Places From API
+======================== */
+
 const fetchPlaces = async () => {
-  loading.value = true;
-  places.value = [];
-  filteredPlaces.value = [];
+
+  loading.value = true
 
   try {
-    const snapshot = await getDocs(collection(db, "places"));
-    places.value = snapshot.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        name: data.name || "",
-        categoryId: data.categoryId || "",
-        priceLevel: data.priceLevel || 0,
-        locationTags: data.locationTags || "",
-        averageRating: Number(data.averageRating) || 0,
-        createdAt: data.createdAt?.toDate
-          ? data.createdAt.toDate()
-          : new Date(),
-        description: data.description || "",
-        imageUrls: data.imageUrls || [],
-        tags: data.tags || [],
-        address: data.location?.address || "",
-      };
-    });
 
-    applyFilters();
-  } catch (err) {
-    console.error("Error fetching places:", err);
+    const res = await axios.get("http://localhost:8080/api/places", {
+      params: {
+        category: activeCategory.value,
+        priceLevel: activePriceLevel.value,
+        location: activeLocationTag.value,
+        rating: activeRating.value
+      }
+    })
+
+    places.value = res.data
+
+  } catch (error) {
+
+    console.error("Fetch places error:", error)
+
   } finally {
-    loading.value = false;
+
+    loading.value = false
+
   }
-};
 
-// ฟังก์ชันกรองแบบ client-side
-const applyFilters = () => {
-  filteredPlaces.value = places.value.filter((p) => {
-    let keep = true;
+}
 
-    // หมวดหมู่
-    if (activeCategory.value) {
-      keep = keep && p.categoryId === activeCategory.value;
-    }
+/* ========================
+   Watch Filter Change
+======================== */
 
-    // ช่วงราคา (ตรงกับ priceLevel 1–5)
-    if (activePriceLevel.value) {
-      keep = keep && p.priceLevel === Number(activePriceLevel.value);
-    }
+watch(
+  [activeCategory, activePriceLevel, activeLocationTag, activeRating],
+  fetchPlaces
+)
 
-    // บริเวณ
-    if (activeLocationTag.value) {
-      keep = keep && p.locationTags === activeLocationTag.value;
-    }
+/* ========================
+   Navigation
+======================== */
 
-    // คะแนนเฉลี่ย
-    if (activeRating.value !== "") {
-      keep = keep && (Number(p.averageRating) || 0) >= Number(activeRating.value);
-    }
+const goToAddPlace = () => {
+  router.push("/add-place")
+}
 
-    return keep;
-  });
-};
+/* ========================
+   Initial Load
+======================== */
 
-
-// กดปุ่มเพิ่มสถานที่
-const goToAddPlace = () => router.push("/add-place");
-
-// ดึงค่า category จาก query param
 onMounted(() => {
-  const categoryQuery = route.query.category;
-  if (categoryQuery) activeCategory.value = categoryQuery;
 
-  fetchPlaces();
-});
+  const categoryQuery = route.query.category
+
+  if (categoryQuery) {
+    activeCategory.value = categoryQuery
+  }
+
+  fetchPlaces()
+
+})
 </script>
 
 <style scoped>
