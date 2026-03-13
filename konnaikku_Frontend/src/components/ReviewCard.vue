@@ -93,185 +93,197 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import axios from "axios";
-import defaultAvatarImg from "@/assets/images/default-avatar.png";
+import { ref, computed, onMounted } from "vue"
+import { useRouter } from "vue-router"
+import axios from "axios"
+import defaultAvatarImg from "@/assets/images/default-avatar.png"
 
 const props = defineProps({
-  review: Object,
-});
+  review: Object
+})
 
-const router = useRouter();
+const router = useRouter()
 
-const API = import.meta.env.VITE_API_URL;
+const API = import.meta.env.VITE_API_URL
 
-const defaultAvatar = defaultAvatarImg;
+const defaultAvatar = defaultAvatarImg
 
-const likesCount = ref(props.review.likes_count || 0);
-const commentsCount = ref(props.review.comments_count || 0);
+const likesCount = ref(props.review.likes_count || 0)
+const commentsCount = ref(props.review.comments_count || 0)
 
-const isLiked = ref(false);
+const isLiked = ref(false)
 
-const showCommentBox = ref(false);
-const newComment = ref("");
-const comments = ref([]);
-const loading = ref(false);
+const showCommentBox = ref(false)
+const newComment = ref("")
+const comments = ref([])
+const loading = ref(false)
 
-/*
------------------------
-Auth Header
------------------------
-*/
+/* -----------------------
+Axios Config
+----------------------- */
 
-const getAuth = () => ({
+const token = localStorage.getItem("token")
+
+const authConfig = {
   headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  },
-});
+    Authorization: token ? `Bearer ${token}` : ""
+  }
+}
 
-/*
------------------------
+/* -----------------------
 Fetch comments
------------------------
-*/
+----------------------- */
 
 const fetchComments = async () => {
   try {
+
     const res = await axios.get(
-      `${API}/api/reviews/${props.review.id}/comments`,
-    );
+      `${API}/reviews/${props.review.id}/comments`
+    )
 
-    comments.value = res.data;
-    commentsCount.value = res.data.length;
+    comments.value = res.data
+    commentsCount.value = res.data.length
+
   } catch (err) {
-    console.error(err);
+    console.error("fetchComments:", err)
   }
-};
+}
 
-/*
------------------------
+/* -----------------------
 Check liked
------------------------
-*/
+----------------------- */
 
 const checkLiked = async () => {
+  if (!token) return
+
   try {
+
     const res = await axios.get(
-      `${API}/api/reviews/${props.review.id}/liked`,
-      getAuth(),
-    );
+      `${API}/reviews/${props.review.id}/liked`,
+      authConfig
+    )
 
-    isLiked.value = res.data.liked;
+    isLiked.value = res.data.liked
+
   } catch (err) {
-    console.error(err);
+    console.error("checkLiked:", err)
   }
-};
+}
 
-/*
------------------------
-Like
------------------------
-*/
+/* -----------------------
+Toggle Like
+----------------------- */
 
 const toggleLike = async () => {
-  try {
-    if (isLiked.value) {
-      await axios.delete(
-        `${API}/api/reviews/${props.review.id}/like`,
-        getAuth(),
-      );
 
-      likesCount.value--;
-      isLiked.value = false;
-    } else {
-      await axios.post(
-        `${API}/api/reviews/${props.review.id}/like`,
-        {},
-        getAuth(),
-      );
-
-      likesCount.value++;
-      isLiked.value = true;
-    }
-  } catch (err) {
-    console.error(err);
+  if (!token) {
+    alert("กรุณาเข้าสู่ระบบก่อน")
+    return
   }
-};
 
-/*
------------------------
-Comment
------------------------
-*/
+  try {
+
+    if (isLiked.value) {
+
+      await axios.delete(
+        `${API}/reviews/${props.review.id}/like`,
+        authConfig
+      )
+
+      likesCount.value = Math.max(0, likesCount.value - 1)
+      isLiked.value = false
+
+    } else {
+
+      await axios.post(
+        `${API}/reviews/${props.review.id}/like`,
+        {},
+        authConfig
+      )
+
+      likesCount.value++
+      isLiked.value = true
+    }
+
+  } catch (err) {
+    console.error("toggleLike:", err)
+  }
+}
+
+/* -----------------------
+Toggle Comment Box
+----------------------- */
 
 const toggleCommentBox = () => {
-  showCommentBox.value = !showCommentBox.value;
-};
+  showCommentBox.value = !showCommentBox.value
+}
+
+/* -----------------------
+Submit Comment
+----------------------- */
 
 const submitComment = async () => {
-  if (!newComment.value.trim()) return;
 
-  loading.value = true;
+  if (!newComment.value.trim()) return
+
+  if (!token) {
+    alert("กรุณาเข้าสู่ระบบก่อน")
+    return
+  }
+
+  loading.value = true
 
   try {
+
     const res = await axios.post(
-      `${API}/api/reviews/${props.review.id}/comments`,
-      {
-        comment: newComment.value,
-      },
-      getAuth(),
-    );
+      `${API}/reviews/${props.review.id}/comments`,
+      { comment: newComment.value },
+      authConfig
+    )
 
-    comments.value.unshift(res.data);
+    comments.value.unshift(res.data)
+    commentsCount.value++
 
-    commentsCount.value++;
+    newComment.value = ""
 
-    newComment.value = "";
   } catch (err) {
-    console.error(err);
+    console.error("submitComment:", err)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-/*
------------------------
+/* -----------------------
 Date
------------------------
-*/
+----------------------- */
 
 const formattedDate = computed(() => {
-  if (!props.review.created_at) return "";
-  return new Date(props.review.created_at).toLocaleDateString("th-TH");
-});
+  if (!props.review.created_at) return ""
+  return new Date(props.review.created_at).toLocaleDateString("th-TH")
+})
 
 const formatDate = (date) => {
-  if (!date) return "";
-  return new Date(date).toLocaleString("th-TH");
-};
+  if (!date) return ""
+  return new Date(date).toLocaleString("th-TH")
+}
 
-/*
------------------------
+/* -----------------------
 Navigation
------------------------
-*/
+----------------------- */
 
 const goToProfile = (userId) => {
-  if (!userId) return;
-  router.push(`/profile/${userId}`);
-};
+  if (!userId) return
+  router.push(`/profile/${userId}`)
+}
 
-/*
------------------------
+/* -----------------------
 Lifecycle
------------------------
-*/
+----------------------- */
 
 onMounted(() => {
-  fetchComments();
-  checkLiked();
-});
+  fetchComments()
+  checkLiked()
+})
 </script>
 
 <style scoped>

@@ -153,12 +153,12 @@ import axios from "axios"
 
 const router = useRouter()
 
-const API = "http://localhost:8080/api"
+const API = import.meta.env.VITE_API_URL
 
 /* USER */
 
 const user = ref(null)
-const defaultAvatar = "/default-avatar.png"
+const defaultAvatar = "/src/assets/images/default-avatar.png"
 
 /* NAVBAR STATE */
 
