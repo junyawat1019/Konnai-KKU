@@ -1,9 +1,20 @@
-const router = require("express").Router();
-const usersController = require("../controllers/usersController");
-const auth = require("../middleware/auth");
+const express = require("express")
+const router = express.Router()
 
-router.get("/:id", usersController.getUser);
-router.put("/profile", auth, usersController.updateProfile);
-router.get("/:id/reviews", usersController.getUserReviews);
+const auth = require("../middlewares/auth")
+const usersController = require("../controllers/usersController")
 
-module.exports = router;
+router.get("/me", auth, usersController.getMe)
+router.put("/me", auth, usersController.updateProfile)
+
+router.get("/:id", usersController.getUser)
+router.get("/:id/reviews", usersController.getUserReviews)
+
+router.get("/:id/places", usersController.getUserPlaces)
+router.get("/:id/favorites", usersController.getUserFavorites)
+router.get("/:id/followers", usersController.getFollowers)
+
+router.get("/:id/photos", usersController.getUserPhotos)
+router.get("/:id/activity", usersController.getUserActivity)
+
+module.exports = router

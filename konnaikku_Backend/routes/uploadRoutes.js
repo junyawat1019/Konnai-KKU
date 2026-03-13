@@ -1,13 +1,15 @@
-const express = require('express')
+const express = require("express")
 const router = express.Router()
 
-const upload = require('../middleware/upload')
-const uploadController = require('../controllers/uploadController')
+const upload = require("../middlewares/upload")
+const auth = require("../middlewares/auth")
+const uploadController = require("../controllers/uploadController")
 
 router.post(
-  '/image',
-  upload.single('image'),
-  uploadController.uploadImage
+  "/profile-photo",
+  auth,
+  upload.single("image"),
+  uploadController.uploadProfilePhoto
 )
 
 module.exports = router

@@ -148,29 +148,51 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import axios from "axios";
+import { ref, computed, onMounted, nextTick } from "vue"
+import { useRoute, useRouter } from "vue-router"
+import axios from "axios"
 
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import ReviewCard from "@/components/ReviewCard.vue";
-import AddReview from "@/components/AddReview.vue";
+import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import ReviewCard from "@/components/ReviewCard.vue"
+import AddReview from "@/components/AddReview.vue"
 
-const route = useRoute();
-const router = useRouter();
+const API = "http://localhost:8080/api"
 
-const placeId = route.params.id;
+const route = useRoute()
+const router = useRouter()
 
-const place = ref(null);
-const reviews = ref([]);
+const placeId = route.params.id
 
-const filterRating = ref(0);
-const reviewsToShow = ref(7);
+const place = ref(null)
+const reviews = ref([])
 
-const addReviewRef = ref(null);
+const filterRating = ref(0)
+const reviewsToShow = ref(7)
 
-const currentUserId = ref(null);
-const isFavorited = ref(false);
+const addReviewRef = ref(null)
+
+const currentUserId = ref(null)
+const token = ref(null)
+
+const isFavorited = ref(false)
+
+/* ======================
+   AUTH HEADER
+====================== */
+
+const authHeader = () => ({
+  headers: {
+    Authorization: `Bearer ${token.value}`
+  }
+})
+
+/* ======================
+   Go To Edit Page
+====================== */
+
+const goToEditPage = () => {
+  router.push(`/edit-place/${placeId}`)
+}
 
 /* ======================
    Fetch Place
@@ -178,177 +200,265 @@ const isFavorited = ref(false);
 
 const fetchPlace = async () => {
   try {
-    const res = await axios.get(`http://localhost:8080/api/places/${placeId}`);
 
-    place.value = res.data;
+    const res = await axios.get(`${API}/places/${placeId}`)
+    const p = res.data || {}
+
+    const imgRes = await axios.get(`${API}/places/${placeId}/images`)
+
+    const imageUrls = (imgRes.data || []).map(i => i.image_url)
+
+    place.value = {
+      id: p.id || "",
+      name: p.name || "",
+      description: p.description || "",
+
+      categoryName: p.category_name || "",
+      priceLevel: Number(p.price_level ?? 0),
+
+      phoneNumber: p.phone_number || "",
+      websiteUrl: p.website_url || "",
+
+      locationTags: p.location_tag || "",
+
+      imageUrls,
+
+      averageRating: Number(p.average_rating ?? 0),
+      reviewCount: Number(p.review_count ?? 0),
+
+      createdBy: p.created_by,
+
+      location: {
+        address: p.address || "",
+        district: p.district || "",
+        province: p.province || "",
+        lat: Number(p.lat || 0),
+        lng: Number(p.lng || 0)
+      }
+    }
+
   } catch (err) {
-    console.error("fetch place error", err);
+
+    console.error("fetch place error", err)
+
   }
-};
+}
 
 /* ======================
    Fetch Reviews
 ====================== */
 
 const fetchReviews = async () => {
-  try {
-    const res = await axios.get(
-      `http://localhost:8080/api/reviews/place/${placeId}`,
-    );
 
-    reviews.value = res.data;
+  try {
+
+    const res = await axios.get(`${API}/reviews/place/${placeId}`)
+
+    reviews.value = res.data || []
+
   } catch (err) {
-    console.error("fetch reviews error", err);
+
+    console.error("fetch reviews error", err)
+
   }
-};
+
+}
 
 /* ======================
    Reviews Filter
 ====================== */
 
 const filteredReviews = computed(() => {
-  if (filterRating.value === 0) return reviews.value;
 
-  return reviews.value.filter((r) => r.rating === filterRating.value);
-});
+  if (filterRating.value === 0) return reviews.value
+
+  return reviews.value.filter(r => r.rating === filterRating.value)
+
+})
 
 const displayedReviews = computed(() =>
-  filteredReviews.value.slice(0, reviewsToShow.value),
-);
+  filteredReviews.value.slice(0, reviewsToShow.value)
+)
 
 /* ======================
-   Google Map
+   GOOGLE MAP
 ====================== */
 
-const getGoogleMapLink = (lat, lng) => {
-  if (!lat || !lng) return "#";
-  return `https://www.google.com/maps?q=${lat},${lng}`;
-};
+const getGoogleMapLink = (lat,lng) => {
+
+  if (!lat || !lng) return "#"
+
+  return `https://www.google.com/maps?q=${lat},${lng}`
+
+}
 
 const goToGoogleMaps = () => {
-  if (!place.value?.location) return;
+
+  if (!place.value?.location) return
 
   window.open(
-    getGoogleMapLink(place.value.location.lat, place.value.location.lng),
-    "_blank",
-  );
-};
+    getGoogleMapLink(place.value.location.lat,place.value.location.lng),
+    "_blank"
+  )
+
+}
 
 /* ======================
-   Favorite
+   FAVORITE
 ====================== */
 
 const checkIfFavorited = async () => {
-  if (!currentUserId.value) return;
 
-  const res = await axios.get(
-    `http://localhost:8080/api/favorites/${currentUserId.value}/${placeId}`,
-  );
+  if (!token.value) return
 
-  isFavorited.value = res.data.favorited;
-};
+  try {
+
+    const res = await axios.get(
+      `${API}/favorites/check/${placeId}`,
+      authHeader()
+    )
+
+    isFavorited.value = res.data?.favorited || false
+
+  } catch (err) {
+
+    console.error("favorite check error", err)
+
+  }
+
+}
 
 const toggleFavorite = async () => {
-  if (!currentUserId.value) {
-    alert("กรุณาเข้าสู่ระบบก่อน");
-    return;
+
+  if (!token.value) {
+
+    alert("กรุณาเข้าสู่ระบบก่อน")
+
+    router.push("/login")
+
+    return
+
   }
 
   try {
+
     if (isFavorited.value) {
+
       await axios.delete(
-        `http://localhost:8080/api/favorites/${currentUserId.value}/${placeId}`,
-      );
+        `${API}/favorites/${placeId}`,
+        authHeader()
+      )
 
-      isFavorited.value = false;
+      isFavorited.value = false
+
     } else {
-      await axios.post("http://localhost:8080/api/favorites", {
-        userId: currentUserId.value,
-        placeId,
-      });
 
-      isFavorited.value = true;
+      await axios.post(
+        `${API}/favorites`,
+        { place_id: placeId },
+        authHeader()
+      )
+
+      isFavorited.value = true
+
     }
+
   } catch (err) {
-    console.error("favorite error", err);
+
+    console.error("favorite error", err)
+
   }
-};
+
+}
 
 /* ======================
-   Photo Viewer
+   PHOTO VIEWER
 ====================== */
 
 const openPhotoViewer = (index) => {
+
   router.push({
     name: "PhotoView",
-    params: { id: placeId, index },
-  });
-};
+    params: { id: placeId, index }
+  })
+
+}
 
 /* ======================
-   Review Scroll
+   REVIEW SCROLL
 ====================== */
 
 const scrollToReview = () => {
+
   nextTick(() => {
-    addReviewRef.value?.$el.scrollIntoView({
-      behavior: "smooth",
-    });
-  });
-};
+
+    addReviewRef.value?.$el?.scrollIntoView({
+      behavior: "smooth"
+    })
+
+  })
+
+}
 
 /* ======================
-   Show All Reviews
+   SHOW ALL REVIEWS
 ====================== */
 
 const showAllReviews = () => {
-  reviewsToShow.value = filteredReviews.value.length;
-};
+
+  reviewsToShow.value = filteredReviews.value.length
+
+}
 
 /* ======================
-   Price Label
+   PRICE LABEL
 ====================== */
 
 const getPriceLabel = (level) => {
-  switch (level) {
-    case 1:
-      return "0 - 100 บาท";
-    case 2:
-      return "101 - 300 บาท";
-    case 3:
-      return "301 - 500 บาท";
-    case 4:
-      return "501 - 1000 บาท";
-    case 5:
-      return "มากกว่า 1000 บาท";
-    default:
-      return "-";
+
+  switch(level){
+
+    case 1: return "0 - 100 บาท"
+    case 2: return "101 - 300 บาท"
+    case 3: return "301 - 500 บาท"
+    case 4: return "501 - 1000 บาท"
+    case 5: return "มากกว่า 1000 บาท"
+
+    default: return "-"
+
   }
-};
+
+}
 
 /* ======================
-   Review Added
+   REVIEW ADDED
 ====================== */
 
 const onReviewAdded = () => {
-  fetchReviews();
 
-  reviewsToShow.value = 7;
-};
+  fetchReviews()
+
+  reviewsToShow.value = 7
+
+}
 
 /* ======================
-   Mounted
+   MOUNTED
 ====================== */
 
 onMounted(() => {
-  currentUserId.value = localStorage.getItem("userId");
 
-  fetchPlace();
+  currentUserId.value = localStorage.getItem("userId")
 
-  fetchReviews();
+  token.value = localStorage.getItem("token")
 
-  checkIfFavorited();
-});
+  fetchPlace()
+
+  fetchReviews()
+
+  checkIfFavorited()
+
+})
 </script>
 
 <style scoped>

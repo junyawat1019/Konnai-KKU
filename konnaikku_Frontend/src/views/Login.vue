@@ -4,12 +4,7 @@
       <h2>เข้าสู่ระบบ</h2>
 
       <form @submit.prevent="loginUser">
-        <input
-          v-model.trim="email"
-          type="email"
-          placeholder="อีเมล"
-          required
-        />
+        <input v-model.trim="email" type="email" placeholder="อีเมล" required />
 
         <input
           v-model.trim="password"
@@ -41,60 +36,69 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
-import { useRouter } from "vue-router"
-import axios from "axios"
-import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import { ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import api from "@/services/api";
+import DefaultLayout from "@/layouts/DefaultLayout.vue";
 
-const router = useRouter()
+const router = useRouter();
 
-const email = ref("")
-const password = ref("")
+const email = ref("");
+const password = ref("");
 
-const loading = ref(false)
-const errorMessage = ref("")
+const loading = ref(false);
+const errorMessage = ref("");
 
-const API = "http://localhost:8080/api"
-
-/* =========================
-   Login
-========================= */
+watch([email, password], () => {
+  errorMessage.value = "";
+});
 
 const loginUser = async () => {
+  if (loading.value) return;
 
-  if (loading.value) return
+  if (!email.value) {
+    errorMessage.value = "กรุณากรอกอีเมล";
+    return;
+  }
 
-  loading.value = true
-  errorMessage.value = ""
+  if (!password.value) {
+    errorMessage.value = "กรุณากรอกรหัสผ่าน";
+    return;
+  }
+
+  loading.value = true;
 
   try {
 
-    const res = await axios.post(`${API}/auth/login`, {
+    const res = await api.post("/auth/login", {
       email: email.value,
-      password: password.value
-    })
+      password: password.value,
+    });
 
-    const { token, user } = res.data
+    const { token, user } = res.data;
 
-    localStorage.setItem("token", token)
-    localStorage.setItem("user", JSON.stringify(user))
+    localStorage.setItem("token", token);
 
-    router.push("/")
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("userId", user.id);
+    }
+
+    window.location.href = "/";
 
   } catch (error) {
 
-    if (error.response) {
-      errorMessage.value = error.response.data.message
-    } else {
-      errorMessage.value = "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"
-    }
+    errorMessage.value =
+      error.response?.data?.message || "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
 
-    console.error(error)
+    password.value = "";
 
   } finally {
-    loading.value = false
+
+    loading.value = false;
+
   }
-}
+};
 </script>
 
 <style scoped>
@@ -135,23 +139,11 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.divider {
-  text-align: center;
-  margin: 16px 0;
+.error-message {
+  margin-top: 10px;
+  color: red;
   font-size: 14px;
-  color: #888;
-}
-
-.google-btn {
-  display: block;
-  margin: 0 auto;
-  padding: 12px;
-  border: none;
-  border-radius: 6px;
-  background: #00aeef;
-  color: white;
-  cursor: pointer;
-  font-weight: bold;
+  text-align: center;
 }
 
 .switch-auth {

@@ -1,262 +1,353 @@
 <template>
   <DefaultLayout>
     <div class="profile-settings">
+
       <h2 class="title">ตั้งค่าโปรไฟล์</h2>
 
-      <!-- รูปโปรไฟล์ -->
-      <div class="profile-photo-section">
-        <div class="photo-wrapper">
-          <img :src="photoURL" alt="Profile Photo" class="profile-photo" />
-        </div>
-        <label class="upload-btn">
-          เปลี่ยนรูปโปรไฟล์
-          <input type="file" @change="uploadProfilePhoto" accept="image/*" />
-        </label>
+      <!-- loading -->
+      <div v-if="loadingProfile" class="loading">
+        กำลังโหลดข้อมูล...
       </div>
 
-      <!-- ฟอร์มแก้ไขโปรไฟล์ -->
-      <form @submit.prevent="updateProfileData" class="profile-form">
-        <div class="form-group">
-          <label>ชื่อผู้ใช้</label>
-          <input
-            v-model.trim="displayName"
-            type="text"
-            placeholder="กรอกชื่อผู้ใช้"
-            required
-          />
-        </div>
+      <div v-else>
 
-        <div class="form-group">
-          <label>เพศ</label>
-          <select v-model="gender">
-            <option value="">เลือกเพศ</option>
-            <option value="ชาย">ชาย</option>
-            <option value="หญิง">หญิง</option>
-            <option value="อื่นๆ">อื่นๆ</option>
-          </select>
-        </div>
+        <!-- PROFILE PHOTO -->
+        <div class="profile-photo-section">
 
-        <div class="form-group">
-          <label>วันเกิด</label>
-          <input v-model="birthday" type="date" />
-        </div>
-
-        <div class="form-group">
-          <label>เกี่ยวกับฉัน</label>
-          <textarea
-            v-model.trim="aboutMe"
-            placeholder="เขียนเกี่ยวกับตัวคุณ..."
-            rows="3"
-          ></textarea>
-        </div>
-
-        <div class="form-group">
-          <label>เบอร์โทรศัพท์</label>
-          <input
-            v-model.trim="phoneNumber"
-            type="tel"
-            placeholder="กรอกเบอร์โทรศัพท์"
-          />
-        </div>
-
-        <button type="submit" class="btn-save" :disabled="loading">
-          {{ loading ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง" }}
-        </button>
-      </form>
-
-      <!-- เปลี่ยนรหัสผ่าน -->
-      <div class="change-password-section">
-        <h3>เปลี่ยนรหัสผ่าน</h3>
-        <form @submit.prevent="changePassword" class="password-form">
-          <div class="form-group password-input">
-            <label>รหัสผ่านใหม่</label>
-            <div class="input-wrapper">
-              <input
-                :type="showNewPassword ? 'text' : 'password'"
-                v-model.trim="newPassword"
-                placeholder="อย่างน้อย 6 ตัวอักษร"
-                minlength="6"
-                required
-              />
-              <span
-                class="toggle-visibility"
-                @click="showNewPassword = !showNewPassword"
-              >
-                <i
-                  :class="showNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"
-                ></i>
-              </span>
-            </div>
+          <div class="photo-wrapper">
+            <img :src="photoURL" class="profile-photo" />
           </div>
 
-          <div class="form-group password-input">
-            <label>ยืนยันรหัสผ่านใหม่</label>
-            <div class="input-wrapper">
-              <input
-                :type="showConfirmPassword ? 'text' : 'password'"
-                v-model.trim="confirmPassword"
-                placeholder="ยืนยันรหัสผ่าน"
-                required
-              />
-              <span
-                class="toggle-visibility"
-                @click="showConfirmPassword = !showConfirmPassword"
-              >
-                <i
-                  :class="
-                    showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'
-                  "
-                ></i>
-              </span>
-            </div>
+          <label class="upload-btn">
+            เปลี่ยนรูปโปรไฟล์
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              @change="uploadProfilePhoto"
+            />
+          </label>
+
+        </div>
+
+        <!-- PROFILE FORM -->
+        <form class="profile-form" @submit.prevent="updateProfileData">
+
+          <div class="form-group">
+            <label>ชื่อผู้ใช้</label>
+            <input
+              v-model.trim="displayName"
+              type="text"
+              required
+              placeholder="กรอกชื่อผู้ใช้"
+            />
           </div>
 
-          <button type="submit" class="btn-change-password" :disabled="loading">
-            {{ loading ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน" }}
+          <div class="form-group">
+            <label>เพศ</label>
+            <select v-model="gender">
+              <option value="">เลือกเพศ</option>
+              <option value="ชาย">ชาย</option>
+              <option value="หญิง">หญิง</option>
+              <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>วันเกิด</label>
+            <input v-model="birthday" type="date" />
+          </div>
+
+          <div class="form-group">
+            <label>เกี่ยวกับฉัน</label>
+            <textarea
+              v-model.trim="aboutMe"
+              rows="3"
+              placeholder="เขียนเกี่ยวกับตัวคุณ"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>เบอร์โทรศัพท์</label>
+            <input
+              v-model.trim="phoneNumber"
+              type="tel"
+              placeholder="0800000000"
+            />
+          </div>
+
+          <button
+            type="submit"
+            class="btn-save"
+            :disabled="savingProfile"
+          >
+            {{ savingProfile ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง" }}
           </button>
+
         </form>
+
+        <!-- CHANGE PASSWORD -->
+        <div class="change-password-section">
+
+          <h3>เปลี่ยนรหัสผ่าน</h3>
+
+          <form @submit.prevent="changePassword" class="password-form">
+
+            <div class="form-group password-input">
+              <label>รหัสผ่านใหม่</label>
+
+              <div class="input-wrapper">
+                <input
+                  :type="showNewPassword ? 'text' : 'password'"
+                  v-model.trim="newPassword"
+                  minlength="6"
+                  required
+                />
+
+                <span
+                  class="toggle-visibility"
+                  @click="showNewPassword = !showNewPassword"
+                >
+                  {{ showNewPassword ? "ซ่อน" : "แสดง" }}
+                </span>
+              </div>
+            </div>
+
+            <div class="form-group password-input">
+              <label>ยืนยันรหัสผ่าน</label>
+
+              <div class="input-wrapper">
+                <input
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  v-model.trim="confirmPassword"
+                  required
+                />
+
+                <span
+                  class="toggle-visibility"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                >
+                  {{ showConfirmPassword ? "ซ่อน" : "แสดง" }}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              class="btn-change-password"
+              :disabled="changingPassword"
+            >
+              {{ changingPassword ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน" }}
+            </button>
+
+          </form>
+
+        </div>
+
       </div>
+
     </div>
   </DefaultLayout>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import axios from "axios";
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import defaultAvatarImage from "@/assets/images/default-avatar.png";
+import { ref, onMounted } from "vue"
+import axios from "axios"
+import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import defaultAvatarImage from "@/assets/images/default-avatar.png"
 
-const API = "http://localhost:8080/api";
+const API = "http://localhost:8080/api"
 
-const displayName = ref("");
-const gender = ref("");
-const birthday = ref("");
-const aboutMe = ref("");
-const phoneNumber = ref("");
-const photoURL = ref(defaultAvatarImage);
+const token = localStorage.getItem("token")
 
-const newPassword = ref("");
-const confirmPassword = ref("");
-const showNewPassword = ref(false);
-const showConfirmPassword = ref(false);
+if (!token) {
+  window.location.href = "/login"
+}
 
-const loading = ref(false);
+const authHeader = {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+}
 
-const token = localStorage.getItem("token");
+/* STATE */
 
-// โหลดข้อมูลผู้ใช้
+const displayName = ref("")
+const gender = ref("")
+const birthday = ref("")
+const aboutMe = ref("")
+const phoneNumber = ref("")
+const photoURL = ref(defaultAvatarImage)
+
+const newPassword = ref("")
+const confirmPassword = ref("")
+
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+const loadingProfile = ref(false)
+const savingProfile = ref(false)
+const changingPassword = ref(false)
+
+/* LOAD PROFILE */
+
 const loadProfile = async () => {
-  try {
-    const res = await axios.get(`${API}/users/me`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
 
-    const user = res.data;
+  const userId = localStorage.getItem("userId")
 
-    displayName.value = user.displayName || "";
-    gender.value = user.gender || "";
-    birthday.value = user.birthday || "";
-    aboutMe.value = user.aboutMe || "";
-    phoneNumber.value = user.phoneNumber || "";
-    photoURL.value = user.photoURL || defaultAvatarImage;
+  if (!userId) return
 
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-onMounted(loadProfile);
-
-// อัปโหลดรูป
-const uploadProfilePhoto = async (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  loading.value = true;
+  loadingProfile.value = true
 
   try {
-    const formData = new FormData();
-    formData.append("image", file);
 
-    const res = await axios.post(`${API}/upload/profile-photo`, formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "multipart/form-data"
-      }
-    });
+    const res = await axios.get(`${API}/users/${userId}`)
 
-    photoURL.value = res.data.url;
+    const user = res.data || {}
 
-    alert("อัปโหลดรูปโปรไฟล์สำเร็จ");
+    displayName.value = user.display_name || ""
+    gender.value = user.gender || ""
+    aboutMe.value = user.about_me || ""
+    phoneNumber.value = user.phone_number || ""
+
+    birthday.value = user.birthday
+      ? new Date(user.birthday).toISOString().slice(0,10)
+      : ""
+
+    photoURL.value = user.photo_url || defaultAvatarImage
+
   } catch (err) {
-    alert("อัปโหลดไม่สำเร็จ");
+
+    console.error("loadProfile error:", err)
+
   } finally {
-    loading.value = false;
-  }
-};
 
-// บันทึกโปรไฟล์
-const updateProfileData = async () => {
-  if (!displayName.value.trim()) {
-    alert("กรุณากรอกชื่อผู้ใช้");
-    return;
+    loadingProfile.value = false
+
   }
 
-  loading.value = true;
+}
+
+/* UPLOAD PHOTO */
+
+const uploadProfilePhoto = async (event) => {
+
+  const file = event.target.files[0]
+
+  if (!file) return
+
+  if (file.size > 5 * 1024 * 1024) {
+    alert("ไฟล์ต้องไม่เกิน 5MB")
+    return
+  }
+
+  const preview = URL.createObjectURL(file)
+  photoURL.value = preview
+
+  const formData = new FormData()
+  formData.append("image", file)
 
   try {
-    await axios.put(`${API}/users/me`,
+
+    const res = await axios.post(
+      `${API}/upload/profile-photo`,
+      formData,
       {
-        displayName: displayName.value,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    )
+
+    photoURL.value = res.data.url
+
+  } catch (err) {
+
+    console.error(err)
+    alert("อัปโหลดรูปไม่สำเร็จ")
+
+  }
+
+}
+
+/* UPDATE PROFILE */
+
+const updateProfileData = async () => {
+
+  savingProfile.value = true
+
+  try {
+
+    await axios.put(
+      `${API}/users/me`,
+      {
+        display_name: displayName.value,
         gender: gender.value,
         birthday: birthday.value,
-        aboutMe: aboutMe.value,
-        phoneNumber: phoneNumber.value
+        about_me: aboutMe.value,
+        phone_number: phoneNumber.value,
+        photo_url: photoURL.value
       },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+      authHeader
+    )
 
-    alert("อัปเดตโปรไฟล์เรียบร้อย");
+    localStorage.setItem("displayName", displayName.value)
+    localStorage.setItem("photoURL", photoURL.value)
+
+    alert("บันทึกข้อมูลสำเร็จ")
+
   } catch (err) {
-    alert("เกิดข้อผิดพลาด");
-  } finally {
-    loading.value = false;
-  }
-};
 
-// เปลี่ยนรหัสผ่าน
-const changePassword = async () => {
-  if (newPassword.value.length < 6) {
-    alert("รหัสผ่านต้องอย่างน้อย 6 ตัว");
-    return;
+    console.error(err)
+    alert("บันทึกไม่สำเร็จ")
+
+  } finally {
+
+    savingProfile.value = false
+
   }
+
+}
+
+/* CHANGE PASSWORD */
+
+const changePassword = async () => {
 
   if (newPassword.value !== confirmPassword.value) {
-    alert("รหัสผ่านไม่ตรงกัน");
-    return;
+    alert("รหัสผ่านไม่ตรงกัน")
+    return
   }
 
-  loading.value = true;
+  changingPassword.value = true
 
   try {
-    await axios.put(`${API}/users/password`,
-      {
-        password: newPassword.value
-      },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
 
-    alert("เปลี่ยนรหัสผ่านสำเร็จ");
+    await axios.put(
+      `${API}/users/me/password`,
+      { password: newPassword.value },
+      authHeader
+    )
 
-    newPassword.value = "";
-    confirmPassword.value = "";
+    alert("เปลี่ยนรหัสผ่านสำเร็จ")
+
+    newPassword.value = ""
+    confirmPassword.value = ""
 
   } catch (err) {
-    alert("เปลี่ยนรหัสผ่านไม่สำเร็จ");
+
+    console.error(err)
+    alert("เปลี่ยนรหัสผ่านไม่สำเร็จ")
+
   } finally {
-    loading.value = false;
+
+    changingPassword.value = false
+
   }
-};
+
+}
+
+onMounted(loadProfile)
 </script>
 
 <style scoped>

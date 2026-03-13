@@ -1,10 +1,17 @@
 <template>
   <DefaultLayout>
     <div class="auth-container">
+
       <h2>สมัครสมาชิก</h2>
 
       <form @submit.prevent="registerUser">
-        <input v-model.trim="displayName" type="text" placeholder="ชื่อผู้ใช้" required />
+
+        <input
+          v-model.trim="displayName"
+          type="text"
+          placeholder="ชื่อผู้ใช้"
+          required
+        />
 
         <select v-model="gender" required>
           <option disabled value="">เลือกเพศ</option>
@@ -16,95 +23,246 @@
         <label>วันเกิด</label>
         <input v-model="birthday" type="date" required />
 
-        <input v-model.trim="email" type="email" placeholder="อีเมล" required />
-        <input v-model.trim="password" type="password" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)" required />
+        <input
+          v-model.trim="email"
+          type="email"
+          placeholder="อีเมล"
+          required
+        />
+
+        <input
+          v-model.trim="password"
+          type="password"
+          placeholder="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)"
+          required
+        />
+
+        <input
+          v-model.trim="confirmPassword"
+          type="password"
+          placeholder="ยืนยันรหัสผ่าน"
+          required
+        />
 
         <button type="submit" :disabled="loading">
-          {{ loading ? "กำลังสมัคร..." : "สมัคร" }}
+          {{ loading ? "กำลังสมัคร..." : "สมัครสมาชิก" }}
         </button>
+
       </form>
 
-      <div class="divider">หรือ</div>
-
-      <button class="google-btn" @click="registerWithGoogle" :disabled="loading">
-        สมัครด้วย Google
-      </button>
+      <p v-if="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </p>
 
       <p class="switch-auth">
         มีบัญชีอยู่แล้ว?
         <router-link to="/login">เข้าสู่ระบบ</router-link>
       </p>
+
     </div>
   </DefaultLayout>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import axios from "axios";
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
 
-const API = "http://localhost:8080/api";
+import { ref, onMounted, onUnmounted, watch } from "vue"
+import { useRouter, useRoute } from "vue-router"
+import axios from "axios"
 
-const email = ref("");
-const password = ref("");
-const displayName = ref("");
-const gender = ref("");
-const birthday = ref("");
+const router = useRouter()
+const route = useRoute()
 
-const loading = ref(false);
-const router = useRouter();
+const API = "http://localhost:8080/api"
 
-const registerUser = async () => {
+/* =========================
+   USER
+========================= */
 
-  if (password.value.length < 6) {
-    alert("รหัสผ่านต้องมีอย่างน้อย 6 ตัว");
-    return;
+const user = ref(null)
+
+const defaultAvatar = "/default-avatar.png"
+
+const loadUserFromLocal = () => {
+
+  const savedUser = localStorage.getItem("user")
+
+  if (!savedUser) {
+    user.value = null
+    return
   }
-
-  loading.value = true;
 
   try {
 
-    const res = await axios.post(`${API}/auth/register`, {
-      displayName: displayName.value,
-      email: email.value,
-      password: password.value,
-      gender: gender.value,
-      birthday: birthday.value
-    });
+    user.value = JSON.parse(savedUser)
 
-    localStorage.setItem("token", res.data.token);
+  } catch {
 
-    alert("สมัครสมาชิกสำเร็จ");
-
-    router.push("/");
-
-  } catch (err) {
-
-    alert(err.response?.data?.message || "สมัครสมาชิกไม่สำเร็จ");
-
-  } finally {
-
-    loading.value = false;
+    localStorage.removeItem("user")
+    user.value = null
 
   }
 
-};
+}
 
-const registerWithGoogle = () => {
-  window.location.href = `${API}/auth/google`;
-};
+const fetchUser = async () => {
+
+  const token = localStorage.getItem("token")
+
+  if (!token) return
+
+  try {
+
+    const res = await axios.get(`${API}/users/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    user.value = res.data
+
+    localStorage.setItem("user", JSON.stringify(res.data))
+
+  } catch {
+
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+
+    user.value = null
+
+  }
+
+}
+
+/* =========================
+   WATCH ROUTE
+========================= */
+
+watch(
+  () => route.fullPath,
+  () => {
+    loadUserFromLocal()
+  }
+)
+
+/* =========================
+   STORAGE LISTENER
+========================= */
+
+const handleStorageChange = () => {
+  loadUserFromLocal()
+}
+
+/* =========================
+   SEARCH
+========================= */
+
+const searchQuery = ref("")
+const searchResults = ref([])
+
+const searchPlaces = async () => {
+
+  if (!searchQuery.value) {
+    searchResults.value = []
+    return
+  }
+
+  try {
+
+    const res = await axios.get(
+      `${API}/places/search?q=${searchQuery.value}`
+    )
+
+    searchResults.value = res.data
+
+  } catch {
+
+    searchResults.value = []
+
+  }
+
+}
+
+const goToPlace = (id) => {
+
+  searchResults.value = []
+
+  router.push(`/place/${id}`)
+
+}
+
+const search = () => {
+
+  if (searchResults.value.length) {
+    router.push(`/place/${searchResults.value[0].id}`)
+  }
+
+}
+
+/* =========================
+   LOCATION
+========================= */
+
+const selectedLocation = ref("ทั้งหมด")
+
+const changeLocation = () => {
+
+  router.push(`/?location=${selectedLocation.value}`)
+
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+
+const goHome = () => router.push("/")
+const goLogin = () => router.push("/login")
+const goProfile = () => router.push("/me")
+
+/* =========================
+   LOGOUT
+========================= */
+
+const logout = () => {
+
+  localStorage.removeItem("token")
+  localStorage.removeItem("user")
+
+  user.value = null
+
+  router.push("/")
+
+}
+
+/* =========================
+   INIT
+========================= */
+
+onMounted(() => {
+
+  loadUserFromLocal()
+  fetchUser()
+
+  window.addEventListener("storage", handleStorageChange)
+
+})
+
+onUnmounted(() => {
+
+  window.removeEventListener("storage", handleStorageChange)
+
+})
+
 </script>
 
 <style scoped>
+
 .auth-container {
   max-width: 400px;
   margin: 50px auto;
   padding: 24px;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
 form {
@@ -113,7 +271,8 @@ form {
   gap: 12px;
 }
 
-input {
+input,
+select {
   padding: 12px;
   border-radius: 6px;
   border: 1px solid #ccc;
@@ -135,23 +294,11 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.divider {
-  text-align: center;
-  margin: 16px 0;
+.error-message {
+  margin-top: 10px;
+  color: red;
   font-size: 14px;
-  color: #888;
-}
-
-.google-btn {
-  display: block;
-  margin: 0 auto;
-  padding: 12px;
-  border: none;
-  border-radius: 6px;
-  background: #00aeef;
-  color: white;
-  cursor: pointer;
-  font-weight: bold;
+  text-align: center;
 }
 
 .switch-auth {
@@ -159,4 +306,5 @@ button:disabled {
   text-align: center;
   font-size: 14px;
 }
+
 </style>

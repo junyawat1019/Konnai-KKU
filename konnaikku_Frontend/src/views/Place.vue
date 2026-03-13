@@ -1,42 +1,43 @@
 <template>
   <DefaultLayout>
     <div class="place-detail-page">
-      <!-- ส่วนหัว -->
+
+      <!-- Header -->
       <div class="place-header">
         <h1>สถานที่รอบมหาวิทยาลัยขอนแก่น</h1>
+
         <button class="add-place-btn" @click="goToAddPlace">
-          <i class="fa fa-plus"></i> เพิ่มสถานที่ใหม่
+          <i class="fa fa-plus"></i>
+          เพิ่มสถานที่ใหม่
         </button>
       </div>
 
-      <!-- แถบกรอง -->
+      <!-- Filter -->
       <div class="filter-bar">
-        <!-- หมวดหมู่ -->
-        <select v-model="activeCategory" @change="applyFilters">
+
+        <select v-model="filters.category">
           <option value="">ทุกหมวดหมู่</option>
           <option value="restaurant">ร้านอาหาร</option>
-          <option value="cafe">คาเฟ่ & เครื่องดื่ม</option>
-          <option value="apartment">หอพัก / อพาร์ตเมนต์</option>
-          <option value="hotel">โรงแรม / ที่พัก</option>
-          <option value="shopping">แหล่งช็อปปิ้ง</option>
+          <option value="cafe">คาเฟ่</option>
+          <option value="apartment">หอพัก</option>
+          <option value="hotel">โรงแรม</option>
+          <option value="shopping">ช็อปปิ้ง</option>
           <option value="tourist">สถานที่ท่องเที่ยว</option>
-          <option value="sports">สถานที่ออกกำลังกาย</option>
-          <option value="entertainment">บันเทิง & ไลฟ์สไตล์</option>
-          <option value="services">บริการต่าง ๆ</option>
+          <option value="sports">ออกกำลังกาย</option>
+          <option value="entertainment">บันเทิง</option>
+          <option value="services">บริการ</option>
         </select>
 
-        <!-- ช่วงราคา -->
-        <select v-model="activePriceLevel" @change="applyFilters">
+        <select v-model="filters.priceLevel">
           <option value="">ทุกช่วงราคา</option>
           <option :value="1">0 - 100 บาท</option>
           <option :value="2">101 - 300 บาท</option>
           <option :value="3">301 - 500 บาท</option>
           <option :value="4">501 - 1000 บาท</option>
-          <option :value="5">มากกว่า 1000 บาท</option>
+          <option :value="5">1000+ บาท</option>
         </select>
 
-        <!-- บริเวณ -->
-        <select v-model="activeLocationTag" @change="applyFilters">
+        <select v-model="filters.location">
           <option value="">ทุกบริเวณ</option>
           <option value="กังสดาล">กังสดาล</option>
           <option value="หลังมอ">หลังมอ</option>
@@ -45,8 +46,7 @@
           <option value="ในเมือง">ในเมือง</option>
         </select>
 
-        <!-- คะแนนเฉลี่ย -->
-        <select v-model="activeRating" @change="applyFilters">
+        <select v-model="filters.rating">
           <option value="">ทุกคะแนน</option>
           <option :value="1">1 ดาวขึ้นไป</option>
           <option :value="2">2 ดาวขึ้นไป</option>
@@ -54,30 +54,44 @@
           <option :value="4">4 ดาวขึ้นไป</option>
           <option :value="5">5 ดาว</option>
         </select>
+
+        <button class="reset-btn" @click="resetFilters">
+          รีเซ็ต
+        </button>
+
       </div>
 
       <!-- Loading -->
-      <div v-if="loading" class="loading-text">กำลังโหลดข้อมูล...</div>
-
-      <!-- ถ้าไม่มีข้อมูล -->
-      <div v-else-if="filteredPlaces.length === 0" class="no-data">
-        ไม่มีสถานที่ที่ตรงกับเงื่อนไข
+      <div v-if="loading" class="loading-text">
+        กำลังโหลดข้อมูล...
       </div>
 
-      <!-- แสดงรายการสถานที่ -->
+      <!-- Error -->
+      <div v-else-if="error" class="error-text">
+        {{ error }}
+      </div>
+
+      <!-- No data -->
+      <div v-else-if="filteredPlaces.length === 0" class="no-data">
+        ไม่พบสถานที่
+      </div>
+
+      <!-- List -->
       <div v-else class="place-list">
+
         <PlaceCard
           v-for="place in filteredPlaces"
           :key="place.id"
           :place="place"
         />
+
       </div>
+
     </div>
   </DefaultLayout>
 </template>
-
 <script setup>
-import { ref, onMounted, watch } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import axios from "axios"
 
@@ -87,38 +101,57 @@ import PlaceCard from "@/components/PlaceCard.vue"
 const router = useRouter()
 const route = useRoute()
 
+const API = "http://localhost:8080/api"
+
+/* =====================
+STATE
+===================== */
+
 const places = ref([])
 const loading = ref(false)
+const error = ref("")
 
-const activeCategory = ref("")
-const activePriceLevel = ref("")
-const activeLocationTag = ref("")
-const activeRating = ref("")
+const filters = ref({
+  category: "",
+  priceLevel: "",
+  location: "",
+  rating: ""
+})
 
-/* ========================
-   Fetch Places From API
-======================== */
+/* =====================
+FETCH DATA
+===================== */
 
 const fetchPlaces = async () => {
 
   loading.value = true
+  error.value = ""
 
   try {
 
-    const res = await axios.get("http://localhost:8080/api/places", {
-      params: {
-        category: activeCategory.value,
-        priceLevel: activePriceLevel.value,
-        location: activeLocationTag.value,
-        rating: activeRating.value
-      }
-    })
+    const res = await axios.get(`${API}/places`)
 
-    places.value = res.data
+    places.value = res.data.map(p => ({
+      id: p.id,
+      name: p.name || "",
+      description: p.description || "",
+      type: p.category_id || "",
+      categoryName: p.category_name || "",
+      imageUrls: p.image_urls || [],
+      locationTags: p.location_tag || "",
+      priceLevel: Number(p.price_level ?? 0),
+      averageRating: Number(p.average_rating ?? 0),
+      reviewCount: Number(p.review_count ?? 0),
+      tags: p.tags || [],
+      createdAt: p.created_at
+        ? new Date(p.created_at)
+        : new Date()
+    }))
 
-  } catch (error) {
+  } catch (err) {
 
-    console.error("Fetch places error:", error)
+    console.error(err)
+    error.value = "โหลดข้อมูลสถานที่ไม่สำเร็จ"
 
   } finally {
 
@@ -128,34 +161,81 @@ const fetchPlaces = async () => {
 
 }
 
-/* ========================
-   Watch Filter Change
-======================== */
+/* =====================
+FILTER
+===================== */
 
-watch(
-  [activeCategory, activePriceLevel, activeLocationTag, activeRating],
-  fetchPlaces
-)
+const filteredPlaces = computed(() => {
 
-/* ========================
-   Navigation
-======================== */
+  return places.value.filter(p => {
 
-const goToAddPlace = () => {
-  router.push("/add-place")
+    if (filters.value.category &&
+        p.type !== filters.value.category)
+      return false
+
+    if (filters.value.priceLevel &&
+        p.priceLevel != filters.value.priceLevel)
+      return false
+
+    if (filters.value.location &&
+        !p.locationTags?.includes(filters.value.location))
+      return false
+
+    if (filters.value.rating &&
+        p.averageRating < filters.value.rating)
+      return false
+
+    return true
+
+  })
+
+})
+
+/* =====================
+RESET FILTER
+===================== */
+
+const resetFilters = () => {
+
+  filters.value = {
+    category: "",
+    priceLevel: "",
+    location: "",
+    rating: ""
+  }
+
 }
 
-/* ========================
-   Initial Load
-======================== */
+/* =====================
+NAVIGATION
+===================== */
+
+const goToAddPlace = () => {
+
+  router.push("/add-place")
+
+}
+
+/* =====================
+WATCH URL QUERY
+===================== */
+
+watch(
+  () => route.query.category,
+  (cat) => {
+
+    if (cat)
+      filters.value.category = cat
+
+  },
+  { immediate: true }
+)
+
+/* =====================
+INIT
+===================== */
 
 onMounted(() => {
-
-  const categoryQuery = route.query.category
-
-  if (categoryQuery) {
-    activeCategory.value = categoryQuery
-  }
 
   fetchPlaces()
 

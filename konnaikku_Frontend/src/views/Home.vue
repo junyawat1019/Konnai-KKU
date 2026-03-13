@@ -1,6 +1,7 @@
 <template>
   <DefaultLayout @updateLocation="updateLocation">
     <div class="page-container">
+
       <!-- Slider -->
       <div
         class="slider-container"
@@ -8,10 +9,10 @@
         @mouseleave="resumeSlider"
       >
         <div
-          v-for="(img, index) in sliderImages"
-          :key="index"
+          v-for="img in sliderImages"
+          :key="img.url"
           class="slide"
-          :class="{ active: index === currentSlide }"
+          :class="{ active: sliderImages.indexOf(img) === currentSlide }"
         >
           <img :src="img.url" :alt="img.alt" />
         </div>
@@ -21,16 +22,16 @@
 
         <div class="dots">
           <span
-            v-for="(img, index) in sliderImages"
-            :key="index"
+            v-for="(img,i) in sliderImages"
+            :key="img.url"
             class="dot"
-            :class="{ active: index === currentSlide }"
-            @click="goToSlide(index)"
+            :class="{ active: i === currentSlide }"
+            @click="goToSlide(i)"
           ></span>
         </div>
       </div>
 
-      <!-- Category Bar -->
+      <!-- Category -->
       <div class="category-bar">
         <div
           v-for="cat in typeOptions"
@@ -39,238 +40,293 @@
           :class="{ active: activeCategory === cat.value }"
           @click="selectCategory(cat.value)"
         >
-          <img :src="cat.icon" class="category-icon" alt="" />
+          <img :src="cat.icon" class="category-icon" />
           <span>{{ cat.label }}</span>
         </div>
       </div>
 
-      <!-- Recommendation Section -->
+      <!-- Recommendation -->
       <div class="recommendation-container">
+
         <div class="recommendation-header">
           <p class="section-title">แนะนำสำหรับคุณ</p>
         </div>
 
-        <!-- Tab Bar -->
+        <!-- Tabs -->
         <div class="tab-bar">
           <button
             v-for="tab in tabs"
             :key="tab.id"
+            class="tab-btn"
+            :class="{ active: activeTab === tab.id }"
             @click="activeTab = tab.id"
-            :class="['tab-btn', { active: activeTab === tab.id }]"
           >
             {{ tab.label }}
           </button>
         </div>
 
+        <!-- Loading -->
+        <div v-if="loadingPlaces" class="loading">
+          กำลังโหลด...
+        </div>
+
         <!-- Place List -->
-        <div v-if="loadingPlaces" class="loading">กำลังโหลด...</div>
         <div v-else>
           <div v-if="displayedPlaces.length" class="place-list">
+
             <PlaceCard
               v-for="place in displayedPlaces"
-              :key="place.id"
+              :key="place.id || place.name"
               :place="place"
             />
+
           </div>
-          <div v-else class="loading">ไม่มีสถานที่สำหรับหมวดนี้</div>
+
+          <div v-else class="loading">
+            ไม่มีสถานที่สำหรับหมวดนี้
+          </div>
         </div>
+
         <div class="view-all-wrapper">
-          <button class="view-all-btn" @click="goToAllPlaces">ดูทั้งหมด</button>
+          <button class="view-all-btn" @click="goToAllPlaces">
+            ดูทั้งหมด
+          </button>
         </div>
+
       </div>
     </div>
   </DefaultLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import PlaceCard from "@/components/PlaceCard.vue";
-import { useRouter } from "vue-router";
-import axios from "axios";
+import { ref, computed, onMounted, onUnmounted } from "vue"
+import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import PlaceCard from "@/components/PlaceCard.vue"
+import { useRouter } from "vue-router"
+import axios from "axios"
 
-const router = useRouter();
+const router = useRouter()
 
-/* ==============================
-   Slider
-============================== */
+/* ================= Slider ================= */
 
 const sliderImages = [
   {
-    url: "https://www.lemon8-app.com/seo/image?item_id=7398129850919272961&index=0",
-    alt: "Scenic view 1",
+    url:"https://www.lemon8-app.com/seo/image?item_id=7398129850919272961&index=0",
+    alt:"Scenic view 1"
   },
   {
-    url: "https://www.lemon8-app.com/seo/image?item_id=7398129850919272961&index=2",
-    alt: "Scenic view 2",
+    url:"https://www.lemon8-app.com/seo/image?item_id=7398129850919272961&index=2",
+    alt:"Scenic view 2"
   },
   {
-    url: "https://www.lemon8-app.com/seo/image?item_id=7339824759103848961&index=2",
-    alt: "Scenic view 3",
-  },
-];
+    url:"https://www.lemon8-app.com/seo/image?item_id=7339824759103848961&index=2",
+    alt:"Scenic view 3"
+  }
+]
 
-const currentSlide = ref(0);
-let sliderTimer = null;
+const currentSlide = ref(0)
+let sliderTimer = null
 
 const nextSlide = () => {
-  currentSlide.value = (currentSlide.value + 1) % sliderImages.length;
-};
+  currentSlide.value =
+    (currentSlide.value + 1) % sliderImages.length
+}
 
 const prevSlide = () => {
   currentSlide.value =
-    (currentSlide.value - 1 + sliderImages.length) % sliderImages.length;
-};
+    (currentSlide.value - 1 + sliderImages.length) %
+    sliderImages.length
+}
 
-const goToSlide = (index) => {
-  currentSlide.value = index;
-};
+const goToSlide = (i) => {
+  currentSlide.value = i
+}
 
-const pauseSlider = () => clearInterval(sliderTimer);
+const startSlider = () => {
+  clearInterval(sliderTimer)
+  sliderTimer = setInterval(nextSlide,5000)
+}
 
-const resumeSlider = () => {
-  clearInterval(sliderTimer);
-  sliderTimer = setInterval(nextSlide, 5000);
-};
+const pauseSlider = () => clearInterval(sliderTimer)
 
-/* ==============================
-   Category
-============================== */
+const resumeSlider = () => startSlider()
+
+/* ================= Category ================= */
 
 const typeOptions = [
-  { value: "restaurant", label: "ร้านอาหาร", icon: "/icons/restaurant.png" },
-  { value: "cafe", label: "คาเฟ่", icon: "/icons/cafe.png" },
-  { value: "hotel", label: "โรงแรม", icon: "/icons/hotel.png" },
-  { value: "tourist", label: "ที่เที่ยว", icon: "/icons/travel.png" },
-  { value: "apartment", label: "อพาร์ตเมนต์", icon: "/icons/apartment.png" },
-  { value: "entertainment", label: "บาร์/ผับ", icon: "/icons/bar.png" },
-];
+  {
+    value:"restaurant",
+    label:"ร้านอาหาร",
+    icon:"https://img.wongnai.com/p/1920x0/2022/03/17/f72e4d7c3e184914b9d0363145342b91.jpg"
+  },
+  {
+    value:"apartment",
+    label:"อพาร์ตเมนต์",
+    icon:"https://img.wongnai.com/p/1920x0/2022/03/17/85539409bd964df8b5b9b3d0d42e0655.jpg"
+  },
+  {
+    value:"hotel",
+    label:"โรงแรม",
+    icon:"https://img.wongnai.com/p/1920x0/2022/03/17/85539409bd964df8b5b9b3d0d42e0655.jpg"
+  },
+  {
+    value:"tourist",
+    label:"ที่เที่ยว",
+    icon:"https://img.wongnai.com/p/1920x0/2022/03/17/2c5274011a82414ebdd9cc3f737fb9ed.jpg"
+  },
+  {
+    value:"cafe",
+    label:"คาเฟ่",
+    icon:"https://img.wongnai.com/p/1920x0/2022/03/17/c32a2d8a041345e18b62d94762545c9f.jpg"
+  },
+  {
+    value:"entertainment",
+    label:"บาร์/ผับ",
+    icon:"https://img.wongnai.com/p/1920x0/2022/03/17/f72e4d7c3e184914b9d0363145342b91.jpg"
+  }
+]
 
-const activeCategory = ref("");
+const activeCategory = ref("")
 
 const selectCategory = (category) => {
-  activeCategory.value = category;
-  router.push({ name: "Place", query: { category } });
-};
+  activeCategory.value = category
 
-/* ==============================
-   Tabs
-============================== */
+  router.push({
+    name:"Place",
+    query:{category}
+  })
+}
 
-const activeTab = ref("popular");
+/* ================= Tabs ================= */
+
+const activeTab = ref("popular")
 
 const tabs = [
-  { id: "popular", label: "ยอดนิยม" },
-  { id: "trending", label: "ใหม่มาแรง" },
-];
+  {id:"popular",label:"ยอดนิยม"},
+  {id:"trending",label:"ใหม่มาแรง"}
+]
 
-/* ==============================
-   Location
-============================== */
+/* ================= Location ================= */
 
-const selectedLocation = ref("ทั้งหมด");
+const selectedLocation = ref("ทั้งหมด")
 
-const updateLocation = (location) => {
-  selectedLocation.value = location;
-};
+const updateLocation = (loc) => {
+  selectedLocation.value = loc
+}
 
-/* ==============================
-   Places State
-============================== */
+/* ================= Places ================= */
 
-const places = ref([]);
-const loadingPlaces = ref(false);
-const errorMessage = ref("");
-
-/* ==============================
-   Fetch Places (จาก Backend API)
-============================== */
+const places = ref([])
+const loadingPlaces = ref(false)
+let isMounted = true
 
 const fetchPlaces = async () => {
-  loadingPlaces.value = true;
 
-  try {
-    const res = await axios.get("http://localhost:8080/api/places");
+  loadingPlaces.value = true
 
-    places.value = res.data.map((place) => ({
-      id: place.id,
-      name: place.name,
-      description: place.description,
-      imageUrls: place.imageUrls || [],
-      categoryName: place.categoryName,
-      type: place.type,
-      locationTags: place.locationTags || [],
-      averageRating: place.averageRating || 0,
-      reviewCount: place.reviewCount || 0,
-      tags: place.tags || [],
-      createdAt: place.createdAt ? new Date(place.createdAt) : new Date(),
-    }));
-  } catch (error) {
-    console.error("Fetch places error:", error);
-    errorMessage.value = "โหลดข้อมูลสถานที่ไม่สำเร็จ";
-  } finally {
-    loadingPlaces.value = false;
+  try{
+
+    const res = await axios.get(
+      "http://localhost:8080/api/places",
+      { timeout:10000 }
+    )
+
+    if(!isMounted) return
+
+    places.value = res.data.map(p => ({
+      id:p.id,
+      name:p.name || "",
+      description:p.description || "",
+      categoryName:p.category_name || "",
+      type:p.category_id || "",
+      imageUrls:p.image_urls || [],
+      locationTags:p.location_tag || "",
+      priceLevel:Number(p.price_level ?? 0),
+      averageRating:Number(p.average_rating ?? 0),
+      reviewCount:Number(p.review_count ?? 0),
+      tags:p.tags || [],
+      createdAt:p.created_at
+        ? new Date(p.created_at)
+        : new Date()
+    }))
+
+  }catch(err){
+
+    console.error("fetch error",err)
+
+  }finally{
+
+    loadingPlaces.value=false
+
   }
-};
 
-/* ==============================
-   Filters
-============================== */
+}
 
-const filteredPlaces = computed(() => {
-  if (!activeCategory.value) return places.value;
+/* ================= Filters ================= */
+
+const filteredPlaces = computed(()=>{
+
+  if(!activeCategory.value)
+    return places.value
 
   return places.value.filter(
-    (place) => place.type === activeCategory.value
-  );
-});
+    p => p.type === activeCategory.value
+  )
 
-const filteredByLocation = computed(() => {
-  if (selectedLocation.value === "ทั้งหมด") return filteredPlaces.value;
+})
 
-  return filteredPlaces.value.filter((place) =>
-    place.locationTags?.includes(selectedLocation.value)
-  );
-});
+const filteredByLocation = computed(()=>{
 
-/* ==============================
-   Displayed Places
-============================== */
+  if(selectedLocation.value==="ทั้งหมด")
+    return filteredPlaces.value
 
-const displayedPlaces = computed(() => {
-  let list = [...filteredByLocation.value];
+  return filteredPlaces.value.filter(
+    p => p.locationTags?.includes(selectedLocation.value)
+  )
 
-  if (activeTab.value === "popular") {
-    list.sort((a, b) => b.averageRating - a.averageRating);
-  }
+})
 
-  if (activeTab.value === "trending") {
-    list.sort((a, b) => b.createdAt - a.createdAt);
-  }
+/* ================= Display ================= */
 
-  return list.slice(0, 8);
-});
+const displayedPlaces = computed(()=>{
 
-/* ==============================
-   Navigation
-============================== */
+  let list = filteredByLocation.value.slice()
+
+  if(activeTab.value==="popular")
+    list.sort((a,b)=>b.averageRating-a.averageRating)
+
+  if(activeTab.value==="trending")
+    list.sort((a,b)=>b.createdAt-a.createdAt)
+
+  return list.slice(0,8)
+
+})
+
+/* ================= Navigation ================= */
 
 const goToAllPlaces = () => {
-  router.push({ name: "Place" });
-};
 
-/* ==============================
-   Lifecycle
-============================== */
+  router.push({
+    name:"Place"
+  })
 
-onMounted(async () => {
-  await fetchPlaces();
-  resumeSlider();
-});
+}
 
-onUnmounted(() => {
-  clearInterval(sliderTimer);
-});
+/* ================= Lifecycle ================= */
+
+onMounted(async()=>{
+
+  await fetchPlaces()
+  startSlider()
+
+})
+
+onUnmounted(()=>{
+
+  isMounted=false
+  clearInterval(sliderTimer)
+
+})
 </script>
 
 <style scoped>

@@ -4,8 +4,10 @@
       <h2>แก้ไขสถานที่</h2>
 
       <form @submit.prevent="updatePlace">
-        <!-- ข้อมูลพื้นฐาน -->
+        <!-- ชื่อ -->
         <input v-model="name" placeholder="ชื่อสถานที่" required />
+
+        <!-- คำอธิบาย -->
         <textarea v-model="description" placeholder="คำอธิบาย"></textarea>
 
         <!-- ประเภท -->
@@ -16,7 +18,7 @@
           </option>
         </select>
 
-        <!-- ช่วงราคา -->
+        <!-- ราคา -->
         <select v-model.number="priceLevel" required>
           <option value="">เลือกช่วงราคา</option>
           <option :value="1">0 - 100 บาท</option>
@@ -27,16 +29,15 @@
         </select>
 
         <!-- แท็ก -->
-        <input
-          v-model="tagsInput"
-          placeholder="แท็ก (คั่นด้วย comma เช่น คาเฟ่,วิวสวย)"
-        />
+        <input v-model="tagsInput" placeholder="แท็ก (คั่นด้วย comma)" />
 
-        <!-- ข้อมูลติดต่อ -->
+        <!-- โทร -->
         <input v-model="phoneNumber" placeholder="เบอร์โทรศัพท์" />
+
+        <!-- website -->
         <input v-model="websiteUrl" placeholder="เว็บไซต์" />
 
-        <!-- แท็กบริเวณ -->
+        <!-- location tag -->
         <select v-model="locationTags">
           <option value="">เลือกบริเวณ</option>
           <option value="กังสดาล">กังสดาล</option>
@@ -46,52 +47,51 @@
           <option value="ในเมือง">ในเมือง</option>
         </select>
 
-        <!-- ที่อยู่ -->
+        <!-- address -->
         <input v-model="address" placeholder="ที่อยู่" />
         <input v-model="district" placeholder="อำเภอ" />
         <input v-model="province" placeholder="จังหวัด" />
 
-        <!-- Google Map Search Box -->
+        <!-- MAP -->
         <div class="map-container">
           <input id="search-box" type="text" placeholder="ค้นหาสถานที่" />
           <div id="map" style="height: 350px; margin-bottom: 10px"></div>
         </div>
 
-        <p>พิกัด: ละติจูด {{ lat }}, ลองจิจูด {{ lng }}</p>
+        <p>พิกัด: {{ lat }} , {{ lng }}</p>
 
-        <!-- อัปโหลดรูปภาพ -->
+        <!-- Upload Image -->
         <input type="file" multiple @change="onFileChange" accept="image/*" />
 
-        <!-- แสดงรูปตัวอย่าง -->
+        <!-- Image Preview -->
         <div
-          v-if="previewImages.length || existingImages.length"
+          v-if="existingImages.length || previewImages.length"
           class="preview-grid"
         >
+          <!-- old images -->
           <div
             v-for="(src, index) in existingImages"
-            :key="'existing-' + index"
+            :key="'old' + index"
             class="preview-item"
           >
             <img :src="src" class="preview-image" />
+
             <button type="button" @click="removeExistingImage(index)">
               ลบ
             </button>
           </div>
 
+          <!-- new images -->
           <div
             v-for="(src, index) in previewImages"
-            :key="'new-' + index"
+            :key="'new' + index"
             class="preview-item"
           >
             <img :src="src" class="preview-image" />
           </div>
         </div>
 
-        <button
-          type="submit"
-          :disabled="loading"
-          :class="{ 'loading-button': loading }"
-        >
+        <button type="submit" :disabled="loading">
           {{ loading ? "กำลังบันทึก..." : "บันทึกการแก้ไข" }}
         </button>
       </form>
@@ -100,206 +100,269 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
-import { useRouter, useRoute } from "vue-router"
-import axios from "axios"
-import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import { ref, onMounted, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import axios from "axios";
+import DefaultLayout from "@/layouts/DefaultLayout.vue";
 
-const router = useRouter()
-const route = useRoute()
+const API = "http://localhost:8080/api";
 
-const API_URL = "http://localhost:8080/api"
+const router = useRouter();
+const route = useRoute();
 
-const placeId = route.params.id
+const placeId = route.params.id;
 
-const loading = ref(false)
+const loading = ref(false);
 
-const name = ref("")
-const description = ref("")
-const type = ref("")
-const phoneNumber = ref("")
-const websiteUrl = ref("")
-const address = ref("")
-const district = ref("")
-const province = ref("")
-const lat = ref(null)
-const lng = ref(null)
-const locationTags = ref("")
-const priceLevel = ref("")
-const tagsInput = ref("")
+const name = ref("");
+const description = ref("");
+const type = ref("");
+const priceLevel = ref("");
+const tagsInput = ref("");
+const phoneNumber = ref("");
+const websiteUrl = ref("");
+const locationTags = ref("");
+const address = ref("");
+const district = ref("");
+const province = ref("");
+const lat = ref(null);
+const lng = ref(null);
 
-const imageFiles = ref([])
-const previewImages = ref([])
-const existingImages = ref([])
+const categories = ref([]);
 
-const categories = ref([])
+const imageFiles = ref([]);
+const previewImages = ref([]);
+const existingImages = ref([]);
+const removedImages = ref([]);
+
+let map;
+let marker;
+
+/* =========================
+FILE CHANGE
+========================= */
 
 const onFileChange = (e) => {
+  const files = Array.from(e.target.files);
 
-  const files = Array.from(e.target.files)
+  imageFiles.value = files;
 
-  imageFiles.value = files
+  previewImages.value.forEach(URL.revokeObjectURL);
 
-  previewImages.value.forEach(URL.revokeObjectURL)
+  previewImages.value = files.map((file) => URL.createObjectURL(file));
+};
 
-  previewImages.value = files.map((f) => URL.createObjectURL(f))
-
-}
+/* =========================
+REMOVE OLD IMAGE
+========================= */
 
 const removeExistingImage = (index) => {
+  const removed = existingImages.value[index];
 
-  existingImages.value.splice(index,1)
+  removedImages.value.push(removed);
 
-}
+  existingImages.value.splice(index, 1);
+};
+
+/* =========================
+LOAD CATEGORY
+========================= */
 
 const loadCategories = async () => {
-
   try {
+    const res = await axios.get(`${API}/categories`);
 
-    const res = await axios.get(`${API_URL}/categories`)
-
-    categories.value = res.data
-
+    if (res.data.success) {
+      categories.value = res.data.data;
+    }
   } catch (err) {
-
-    console.error("โหลดหมวดหมู่ไม่สำเร็จ", err)
-
+    console.error(err);
   }
+};
 
-}
+/* =========================
+LOAD PLACE
+========================= */
 
 const loadPlace = async () => {
-
   try {
+    const res = await axios.get(`${API}/places/${placeId}`);
 
-    const res = await axios.get(`${API_URL}/places/${placeId}`)
+    const data = res.data;
 
-    const data = res.data
+    name.value = data.name;
+    description.value = data.description;
+    type.value = data.category_id;
+    priceLevel.value = data.price_level;
+    phoneNumber.value = data.phone_number;
+    websiteUrl.value = data.website_url;
+    locationTags.value = data.location_tag;
+    address.value = data.address;
+    district.value = data.district;
+    province.value = data.province;
+    lat.value = data.lat;
+    lng.value = data.lng;
 
-    name.value = data.name
-    description.value = data.description
-    type.value = data.category_id
-    priceLevel.value = data.price_level
-    phoneNumber.value = data.phone_number
-    websiteUrl.value = data.website_url
-    locationTags.value = data.location_tag
-    address.value = data.address
-    district.value = data.district
-    province.value = data.province
-    lat.value = data.lat
-    lng.value = data.lng
+    const imgRes = await axios.get(`${API}/places/${placeId}/images`);
 
-    existingImages.value = data.images || []
-
-  } catch (error) {
-
-    console.error("โหลดสถานที่ไม่สำเร็จ", error)
-
+    existingImages.value = imgRes.data.map((img) => img.image_url);
+  } catch (err) {
+    console.error("โหลดสถานที่ไม่สำเร็จ", err);
   }
+};
 
-}
+/* =========================
+MAP
+========================= */
 
-const uploadImages = async () => {
+const initMap = () => {
+  const defaultPos = {
+    lat: Number(lat.value) || 13.736717,
+    lng: Number(lng.value) || 100.523186,
+  };
 
-  const urls = []
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: defaultPos,
+    zoom: 15,
+  });
 
-  for (const file of imageFiles.value) {
+  marker = new google.maps.Marker({
+    position: defaultPos,
+    map: map,
+    draggable: true,
+  });
 
-    const formData = new FormData()
+  marker.addListener("dragend", () => {
+    const pos = marker.getPosition();
 
-    formData.append("image", file)
+    lat.value = pos.lat();
+    lng.value = pos.lng();
+  });
 
-    const res = await axios.post(
-      `${API_URL}/upload/image`,
-      formData,
-      {
-        headers:{
-          "Content-Type":"multipart/form-data"
-        }
-      }
-    )
+  const input = document.getElementById("search-box");
 
-    urls.push(res.data.imageUrl)
+  const searchBox = new google.maps.places.SearchBox(input);
 
-  }
+  map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
 
-  return urls
+  searchBox.addListener("places_changed", () => {
+    const places = searchBox.getPlaces();
 
-}
+    if (!places.length) return;
+
+    const place = places[0];
+
+    if (!place.geometry) return;
+
+    lat.value = place.geometry.location.lat();
+    lng.value = place.geometry.location.lng();
+
+    map.setCenter(place.geometry.location);
+    map.setZoom(16);
+
+    marker.setPosition(place.geometry.location);
+  });
+
+  map.addListener("click", (e) => {
+    lat.value = e.latLng.lat();
+    lng.value = e.latLng.lng();
+
+    marker.setPosition(e.latLng);
+  });
+};
+
+/* =========================
+UPDATE PLACE
+========================= */
 
 const updatePlace = async () => {
+  if (!placeId) {
+    alert("ไม่พบ place id");
+    return;
+  }
 
-  const token = localStorage.getItem("token")
+  const token = localStorage.getItem("token");
 
   if (!token) {
-
-    alert("กรุณาเข้าสู่ระบบก่อน")
-
-    return
-
+    alert("กรุณา login");
+    return;
   }
 
-  loading.value = true
+  loading.value = true;
 
   try {
+    const form = new FormData();
 
-    const newImages = await uploadImages()
+    form.append("name", name.value);
+    form.append("description", description.value);
+    form.append("category_id", type.value);
+    form.append("price_level", priceLevel.value);
 
-    const finalImages = [...existingImages.value,...newImages]
+    form.append("address", address.value);
+    form.append("district", district.value);
+    form.append("province", province.value);
 
-    await axios.put(
+    form.append("lat", lat.value);
+    form.append("lng", lng.value);
 
-      `${API_URL}/places/${placeId}`,
+    form.append("phone_number", phoneNumber.value);
+    form.append("website_url", websiteUrl.value);
+    form.append("location_tag", locationTags.value);
 
-      {
-        name:name.value,
-        description:description.value,
-        category_id:type.value,
-        price_level:priceLevel.value,
-        phone_number:phoneNumber.value,
-        website_url:websiteUrl.value,
-        location_tag:locationTags.value,
-        address:address.value,
-        district:district.value,
-        province:province.value,
-        lat:lat.value,
-        lng:lng.value,
-        images:finalImages
+    form.append("removedImages", JSON.stringify(removedImages.value));
+
+    imageFiles.value.forEach((file) => {
+      form.append("images", file);
+    });
+
+    const res = await axios.put(`${API}/places/${placeId}`, form, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
       },
+    });
 
-      {
-        headers:{
-          Authorization:`Bearer ${token}`
-        }
-      }
+    console.log(res.data);
 
-    )
+    alert("แก้ไขสำเร็จ");
 
-    alert("แก้ไขสำเร็จ")
+    router.push(`/place/${placeId}`);
+  } catch (err) {
+    console.error("update error:", err.response?.data || err);
 
-    router.push(`/places/${placeId}`)
-
-  } catch (error) {
-
-    console.error(error)
-
-    alert("เกิดข้อผิดพลาด")
-
+    alert("เกิดข้อผิดพลาด");
   } finally {
-
-    loading.value = false
-
+    loading.value = false;
   }
+};
 
-}
+/* =========================
+INIT
+========================= */
 
-onMounted(()=>{
+onMounted(async () => {
+  await loadCategories();
+  await loadPlace();
 
-  loadCategories()
+  if (window.google) {
+    initMap();
+  } else {
+    const script = document.createElement("script");
 
-  loadPlace()
+    script.src =
+      "https://maps.googleapis.com/maps/api/js?key=AIzaSyA0o70lTNSC3teBOdcJsNm8cWLDNcjwnYk&libraries=places";
 
-})
+    script.async = true;
+    script.defer = true;
+    script.onload = initMap;
+
+    document.head.appendChild(script);
+  }
+});
+
+onUnmounted(() => {
+  previewImages.value.forEach(URL.revokeObjectURL);
+});
 </script>
 
 <style scoped>
@@ -355,7 +418,9 @@ button {
   font-weight: 500;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.1s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.1s ease;
 }
 
 button:hover {

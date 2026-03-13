@@ -1,44 +1,54 @@
 <template>
   <div class="review-card">
-    <!-- Review Header -->
-    <div class="review-header" @click="goToProfile()">
+    <!-- Header -->
+    <div class="review-header" @click="goToProfile(review.user_id)">
       <img
-        :src="reviewUser.photoURL || defaultAvatar"
-        alt="avatar"
+        :src="review.photo_url || defaultAvatar"
         class="avatar"
       />
+
       <div class="review-info">
         <p class="username">
-          <strong>{{ reviewUser.displayName || "ผู้ใช้ไม่ระบุชื่อ" }}</strong>
+          <strong>{{ review.display_name || "ผู้ใช้ไม่ระบุชื่อ" }}</strong>
         </p>
-        <p class="rating"><i class="fa fa-star"></i> {{ review.rating }}</p>
-        <p>
-          <span class="date">{{ formattedDate }}</span>
+
+        <p class="rating">
+          <i class="fa fa-star"></i>
+          {{ review.rating }}
         </p>
+
+        <span class="date">{{ formattedDate }}</span>
       </div>
     </div>
 
-    <!-- Review Comment -->
-    <p class="comment">{{ review.comment }}</p>
+    <!-- Comment -->
+    <p v-if="review.comment" class="comment">
+      {{ review.comment }}
+    </p>
 
-    <!-- Review Images -->
-    <div v-if="review.imageUrls?.length" class="review-images">
+    <!-- Images -->
+    <div v-if="review.images?.length" class="review-images">
       <img
-        v-for="(url, i) in review.imageUrls"
+        v-for="(img, i) in review.images"
         :key="i"
-        :src="url"
+        :src="img"
         class="review-img"
       />
     </div>
 
     <!-- Actions -->
     <div class="review-actions">
-      <button @click.stop="toggleLike" :class="{ liked: isLiked }">
-        <i class="fa" :class="isLiked ? 'fa-thumbs-up' : 'fa-thumbs-up'"></i>
+      <button
+        @click.stop="toggleLike"
+        :class="{ liked: isLiked }"
+      >
+        <i class="fa fa-thumbs-up"></i>
         {{ likesCount }}
       </button>
+
       <button @click.stop="toggleCommentBox">
-        <i class="fa fa-comment"></i> {{ commentsCount }}
+        <i class="fa fa-comment"></i>
+        {{ commentsCount }}
       </button>
     </div>
 
@@ -49,6 +59,7 @@
         placeholder="เขียนคอมเมนต์..."
         rows="2"
       ></textarea>
+
       <button @click="submitComment" :disabled="loading">
         {{ loading ? "กำลังส่ง..." : "ส่ง" }}
       </button>
@@ -57,17 +68,24 @@
     <!-- Comment List -->
     <div v-if="comments.length" class="comment-list">
       <div v-for="c in comments" :key="c.id" class="comment-item">
-        <div class="comment-user" @click="goToProfile(c.userId)">
+        <div
+          class="comment-user"
+          @click="goToProfile(c.user_id)"
+        >
           <img
-            :src="c.userPhotoURL || c.userFetchedPhoto || defaultAvatar"
-            alt="avatar"
+            :src="c.photo_url || defaultAvatar"
             class="comment-avatar"
           />
-          <strong class="comment-username">{{
-            c.username || c.userFetchedName || "ผู้ใช้ไม่ระบุชื่อ"
-          }}</strong>
-          <span class="comment-date">{{ formatDate(c.createdAt) }}</span>
+
+          <strong class="comment-username">
+            {{ c.display_name }}
+          </strong>
+
+          <span class="comment-date">
+            {{ formatDate(c.created_at) }}
+          </span>
         </div>
+
         <p class="comment-text">{{ c.comment }}</p>
       </div>
     </div>
@@ -75,198 +93,185 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
-import { useRouter } from "vue-router"
-import axios from "axios"
-import defaultAvatarImg from "@/assets/images/default-avatar.png"
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import axios from "axios";
+import defaultAvatarImg from "@/assets/images/default-avatar.png";
 
 const props = defineProps({
   review: Object,
-  placeId: String
-})
+});
 
-const router = useRouter()
-const defaultAvatar = defaultAvatarImg
+const router = useRouter();
 
-const likesCount = ref(props.review.likesCount || 0)
-const commentsCount = ref(props.review.commentsCount || 0)
-const isLiked = ref(false)
+const API = "http://localhost:8080";
 
-const showCommentBox = ref(false)
-const newComment = ref("")
-const comments = ref([])
-const loading = ref(false)
+const defaultAvatar = defaultAvatarImg;
 
-const reviewUser = ref({
-  displayName: "",
-  photoURL: defaultAvatar
-})
+const likesCount = ref(props.review.likes_count || 0);
+const commentsCount = ref(props.review.comments_count || 0);
+
+const isLiked = ref(false);
+
+const showCommentBox = ref(false);
+const newComment = ref("");
+const comments = ref([]);
+const loading = ref(false);
 
 /*
-|--------------------------------------------------------------------------
-| API
-|--------------------------------------------------------------------------
+-----------------------
+Auth Header
+-----------------------
 */
 
-const API = "http://localhost:8080/api"
+const getAuth = () => ({
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  },
+});
 
 /*
-|--------------------------------------------------------------------------
-| Fetch review user
-|--------------------------------------------------------------------------
-*/
-
-const fetchReviewUser = async () => {
-  try {
-    const res = await axios.get(`${API}/users/${props.review.userId}`)
-    reviewUser.value = {
-      displayName: res.data.displayName,
-      photoURL: res.data.photoURL || defaultAvatar
-    }
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-/*
-|--------------------------------------------------------------------------
-| Fetch likes
-|--------------------------------------------------------------------------
-*/
-
-const fetchLikes = async () => {
-  try {
-    const res = await axios.get(`${API}/reviews/${props.review.id}/likes`)
-    likesCount.value = res.data.count
-    isLiked.value = res.data.isLiked
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-/*
-|--------------------------------------------------------------------------
-| Fetch comments
-|--------------------------------------------------------------------------
+-----------------------
+Fetch comments
+-----------------------
 */
 
 const fetchComments = async () => {
   try {
-    const res = await axios.get(`${API}/reviews/${props.review.id}/comments`)
-    comments.value = res.data
-    commentsCount.value = res.data.length
+    const res = await axios.get(
+      `${API}/api/reviews/${props.review.id}/comments`,
+    );
+
+    comments.value = res.data;
+    commentsCount.value = res.data.length;
   } catch (err) {
-    console.error(err)
+    console.error(err);
   }
-}
+};
 
 /*
-|--------------------------------------------------------------------------
-| Like / Unlike
-|--------------------------------------------------------------------------
+-----------------------
+Check liked
+-----------------------
+*/
+
+const checkLiked = async () => {
+  try {
+    const res = await axios.get(
+      `${API}/api/reviews/${props.review.id}/liked`,
+      getAuth(),
+    );
+
+    isLiked.value = res.data.liked;
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+/*
+-----------------------
+Like
+-----------------------
 */
 
 const toggleLike = async () => {
-
   try {
-
     if (isLiked.value) {
+      await axios.delete(
+        `${API}/api/reviews/${props.review.id}/like`,
+        getAuth(),
+      );
 
-      await axios.delete(`${API}/reviews/${props.review.id}/like`)
-
-      likesCount.value--
-      isLiked.value = false
-
+      likesCount.value--;
+      isLiked.value = false;
     } else {
+      await axios.post(
+        `${API}/api/reviews/${props.review.id}/like`,
+        {},
+        getAuth(),
+      );
 
-      await axios.post(`${API}/reviews/${props.review.id}/like`)
-
-      likesCount.value++
-      isLiked.value = true
-
+      likesCount.value++;
+      isLiked.value = true;
     }
-
   } catch (err) {
-    console.error(err)
+    console.error(err);
   }
-
-}
+};
 
 /*
-|--------------------------------------------------------------------------
-| Comment
-|--------------------------------------------------------------------------
+-----------------------
+Comment
+-----------------------
 */
 
 const toggleCommentBox = () => {
-  showCommentBox.value = !showCommentBox.value
-}
+  showCommentBox.value = !showCommentBox.value;
+};
 
 const submitComment = async () => {
+  if (!newComment.value.trim()) return;
 
-  if (!newComment.value.trim()) return
-
-  loading.value = true
+  loading.value = true;
 
   try {
+    const res = await axios.post(
+      `${API}/api/reviews/${props.review.id}/comments`,
+      {
+        comment: newComment.value,
+      },
+      getAuth(),
+    );
 
-    await axios.post(`${API}/reviews/${props.review.id}/comments`, {
-      comment: newComment.value
-    })
+    comments.value.unshift(res.data);
 
-    newComment.value = ""
+    commentsCount.value++;
 
-    fetchComments()
-
+    newComment.value = "";
   } catch (err) {
-
-    console.error(err)
-
+    console.error(err);
   } finally {
-
-    loading.value = false
-
+    loading.value = false;
   }
-
-}
+};
 
 /*
-|--------------------------------------------------------------------------
-| Date format
-|--------------------------------------------------------------------------
+-----------------------
+Date
+-----------------------
 */
 
 const formattedDate = computed(() => {
-  if (!props.review.createdAt) return ""
-  return new Date(props.review.createdAt).toLocaleDateString()
-})
+  if (!props.review.created_at) return "";
+  return new Date(props.review.created_at).toLocaleDateString("th-TH");
+});
 
 const formatDate = (date) => {
-  if (!date) return ""
-  return new Date(date).toLocaleString()
-}
+  if (!date) return "";
+  return new Date(date).toLocaleString("th-TH");
+};
 
 /*
-|--------------------------------------------------------------------------
-| Navigation
-|--------------------------------------------------------------------------
+-----------------------
+Navigation
+-----------------------
 */
 
-const goToProfile = (userId = props.review.userId) => {
-  router.push(`/profile/${userId}`)
-}
+const goToProfile = (userId) => {
+  if (!userId) return;
+  router.push(`/profile/${userId}`);
+};
 
 /*
-|--------------------------------------------------------------------------
-| Lifecycle
-|--------------------------------------------------------------------------
+-----------------------
+Lifecycle
+-----------------------
 */
 
 onMounted(() => {
-  fetchReviewUser()
-  fetchLikes()
-  fetchComments()
-})
+  fetchComments();
+  checkLiked();
+});
 </script>
 
 <style scoped>
@@ -298,19 +303,35 @@ onMounted(() => {
 .review-info {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 4px;
 }
 
 .username {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 15px;
+  color: #222;
+}
+
+.rating {
+  font-size: 13px;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .comment {
   margin: 12px 0;
   font-size: 14px;
   line-height: 1.6;
+  color: #333;
 }
+
+.date {
+  margin-top: 18px;
+  font-size: 12px;
+  color: #777;
+} 
 
 .review-images {
   display: grid;

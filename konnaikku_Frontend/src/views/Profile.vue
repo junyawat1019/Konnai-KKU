@@ -48,7 +48,8 @@
             <strong>เพศ:</strong> {{ gender || "ไม่มีข้อมูล" }}
           </div>
           <div class="info-item">
-            <strong>วันเกิด:</strong> {{ birthday || "ไม่มีข้อมูล" }}
+            <strong>วันเกิด:</strong>
+            {{ formatDate(birthday) || "ไม่มีข้อมูล" }}
           </div>
           <div class="info-item">
             <strong>เกี่ยวกับฉัน:</strong> {{ aboutMe || "ไม่มีข้อมูล" }}
@@ -145,7 +146,12 @@
 
               <!-- Photos Tab -->
               <div v-if="activeTab === 'photos'" class="photo-grid">
-                <img v-for="p in userPhotos" :key="p.id + p.url" :src="p.url" />
+                <img
+                  v-for="p in userPhotos"
+                  :key="p.id"
+                  :src="p.url"
+                  @click="goToPlaceDetail(p.place_id)"
+                />
                 <div v-if="userPhotos.length === 0">ยังไม่มีรูปภาพ</div>
               </div>
             </div>
@@ -171,189 +177,328 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import axios from "axios";
+import { ref, computed, onMounted, watch } from "vue"
+import { useRouter, useRoute } from "vue-router"
+import axios from "axios"
 
-import DefaultLayout from "@/layouts/DefaultLayout.vue";
-import defaultAvatarImage from "@/assets/images/default-avatar.png";
-import PlaceCard from "@/components/PlaceCard.vue";
-import ReviewCard from "@/components/ReviewCard.vue";
+import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import defaultAvatarImage from "@/assets/images/default-avatar.png"
+import PlaceCard from "@/components/PlaceCard.vue"
+import ReviewCard from "@/components/ReviewCard.vue"
 
-const router = useRouter();
-const route = useRoute();
+const router = useRouter()
+const route = useRoute()
 
-const API = "http://localhost:8080/api";
+const API = "http://localhost:8080/api"
 
-// ------------------- User IDs -------------------
-const currentUserId = ref(null);
-const profileUserId = ref(route.params.userId || null);
+/* USER ID */
 
-const isOwnProfile = computed(
-  () => !route.params.userId || route.params.userId === currentUserId.value,
-);
+const currentUserId = ref(null)
+const profileUserId = ref(null)
 
-// ------------------- User Info -------------------
-const displayName = ref("");
-const gender = ref("");
-const birthday = ref("");
-const aboutMe = ref("");
-const phoneNumber = ref("");
-const email = ref("");
-const photoURL = ref(defaultAvatarImage);
-const createdAt = ref(null);
+const isOwnProfile = computed(() => {
+  return profileUserId.value === currentUserId.value
+})
 
-// ------------------- Followers -------------------
-const followersCount = ref(0);
-const followingCount = ref(0);
-const isFollowing = ref(false);
-const followLoading = ref(false);
+/* USER DATA */
 
-// ------------------- Tabs -------------------
-const activeTab = ref("activity");
-const recentActivity = ref([]);
-const userReviews = ref([]);
-const userPhotos = ref([]);
-const myPlaces = ref([]);
-const favorites = ref([]);
+const displayName = ref("")
+const gender = ref("")
+const birthday = ref("")
+const aboutMe = ref("")
+const phoneNumber = ref("")
+const email = ref("")
+const photoURL = ref(defaultAvatarImage)
+const createdAt = ref(null)
 
-// ------------------- Format Date -------------------
+/* FOLLOW */
+
+const followersCount = ref(0)
+const followingCount = ref(0)
+const isFollowing = ref(false)
+const followLoading = ref(false)
+
+/* TABS */
+
+const activeTab = ref("activity")
+
+const recentActivity = ref([])
+const userReviews = ref([])
+const userPhotos = ref([])
+const myPlaces = ref([])
+const favorites = ref([])
+
+/* FORMAT DATE */
+
 const formatDate = (date) => {
-  if (!date) return "";
-  return new Date(date).toLocaleDateString("th-TH");
-};
+  if (!date) return "ไม่มีข้อมูล"
 
-// ------------------- Load Profile -------------------
+  return new Date(date).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  })
+}
+
+/* LOAD PROFILE */
+
 const loadProfile = async () => {
-  const userId = profileUserId.value || currentUserId.value;
-  if (!userId) return;
-
   try {
-    const res = await axios.get(`${API}/users/${userId}`);
-    const data = res.data;
 
-    displayName.value = data.displayName;
-    email.value = data.email;
-    gender.value = data.gender;
-    birthday.value = data.birthday;
-    aboutMe.value = data.aboutMe;
-    phoneNumber.value = data.phoneNumber;
-    photoURL.value = data.photoURL || defaultAvatarImage;
-    createdAt.value = data.createdAt;
+    const res = await axios.get(`${API}/users/${profileUserId.value}`)
+
+    const u = res.data || {}
+
+    displayName.value = u.display_name ?? ""
+    email.value = u.email ?? ""
+    gender.value = u.gender ?? ""
+    birthday.value = u.birthday ?? ""
+    aboutMe.value = u.about_me ?? ""
+    phoneNumber.value = u.phone_number ?? ""
+    photoURL.value = u.photo_url || defaultAvatarImage
+    createdAt.value = u.created_at ?? null
+
   } catch (err) {
-    console.error("load profile error", err);
+
+    console.error("profile error", err)
+
   }
+}
 
-  loadFollowers();
-  loadReviews();
-  loadPlaces();
-  loadFavorites();
-};
+/* FOLLOWERS */
 
-// ------------------- Followers -------------------
 const loadFollowers = async () => {
-  const res = await axios.get(`${API}/users/${profileUserId.value}/followers`);
+  try {
 
-  followersCount.value = res.data.followersCount;
-  followingCount.value = res.data.followingCount;
-  isFollowing.value = res.data.isFollowing;
-};
+    const res = await axios.get(
+      `${API}/users/${profileUserId.value}/followers`
+    )
 
-// ------------------- Reviews -------------------
+    const data = res.data || {}
+
+    followersCount.value = data.followersCount ?? 0
+    followingCount.value = data.followingCount ?? 0
+    isFollowing.value = data.isFollowing ?? false
+
+  } catch (err) {
+
+    console.error("followers error", err)
+
+  }
+}
+
+/* REVIEWS */
+
 const loadReviews = async () => {
-  const res = await axios.get(`${API}/users/${profileUserId.value}/reviews`);
+  try {
 
-  userReviews.value = res.data;
+    const res = await axios.get(
+      `${API}/users/${profileUserId.value}/reviews`
+    )
 
-  userPhotos.value = res.data
-    .flatMap((r) => r.imageUrls || [])
-    .map((url) => ({
-      url,
-      placeId: r.placeId,
-    }));
-};
+    userReviews.value = res.data || []
 
-// ------------------- Places -------------------
+  } catch (err) {
+
+    console.error("reviews error", err)
+
+  }
+}
+
+/* PHOTOS */
+
+const loadPhotos = async () => {
+  try {
+
+    const res = await axios.get(
+      `${API}/users/${profileUserId.value}/photos`
+    )
+
+    userPhotos.value = res.data || []
+
+  } catch (err) {
+
+    console.error("photos error", err)
+
+  }
+}
+
+/* PLACES */
+
 const loadPlaces = async () => {
-  const res = await axios.get(`${API}/users/${profileUserId.value}/places`);
+  try {
 
-  myPlaces.value = res.data;
-};
+    const res = await axios.get(
+      `${API}/users/${profileUserId.value}/places`
+    )
 
-// ------------------- Favorites -------------------
+    myPlaces.value = res.data || []
+
+  } catch (err) {
+
+    console.error("places error", err)
+
+  }
+}
+
+/* FAVORITES */
+
 const loadFavorites = async () => {
-  const res = await axios.get(`${API}/users/${profileUserId.value}/favorites`);
+  try {
 
-  favorites.value = res.data;
-};
+    const res = await axios.get(
+      `${API}/users/${profileUserId.value}/favorites`
+    )
 
-// ------------------- Follow -------------------
+    favorites.value = res.data || []
+
+  } catch (err) {
+
+    console.error("favorites error", err)
+
+  }
+}
+
+/* ACTIVITY */
+
+const loadActivity = () => {
+
+  const activity = []
+
+  myPlaces.value.forEach((p) => {
+    activity.push({
+      type: "add_place",
+      placeName: p.name,
+      createdAt: p.created_at
+    })
+  })
+
+  userReviews.value.forEach((r) => {
+    activity.push({
+      type: "review",
+      placeName: r.place_name,
+      createdAt: r.created_at
+    })
+  })
+
+  activity.sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  )
+
+  recentActivity.value = activity.slice(0, 20)
+}
+
+/* FOLLOW ACTION */
+
 const toggleFollow = async () => {
-  if (followLoading.value || isOwnProfile.value) return;
 
-  followLoading.value = true;
+  if (followLoading.value || isOwnProfile.value) return
+
+  followLoading.value = true
 
   try {
+
     if (isFollowing.value) {
+
       await axios.delete(
-        `${API}/users/${profileUserId.value}/follow/${currentUserId.value}`,
-      );
+        `${API}/users/${profileUserId.value}/follow/${currentUserId.value}`
+      )
 
-      isFollowing.value = false;
-      followersCount.value--;
+      isFollowing.value = false
+      followersCount.value--
+
     } else {
-      await axios.post(`${API}/users/${profileUserId.value}/follow`, {
-        followerId: currentUserId.value,
-      });
 
-      isFollowing.value = true;
-      followersCount.value++;
+      await axios.post(
+        `${API}/users/${profileUserId.value}/follow`,
+        { followerId: currentUserId.value }
+      )
+
+      isFollowing.value = true
+      followersCount.value++
+
     }
+
   } catch (err) {
-    console.error("follow error", err);
+
+    console.error("follow error", err)
+
   } finally {
-    followLoading.value = false;
+
+    followLoading.value = false
+
   }
-};
+}
 
-// ------------------- Navigation -------------------
-const goToEditProfile = () => router.push("/profile/settings");
+/* NAVIGATION */
 
-const goToPlaceDetail = (placeId, reviewId = null) => {
-  if (reviewId) {
-    router.push({
-      path: `/place/${placeId}`,
-      query: { reviewId },
-    });
-  } else {
-    router.push(`/place/${placeId}`);
+const goToEditProfile = () => {
+  router.push("/profile/settings")
+}
+
+const goToPlaceDetail = (placeId) => {
+  router.push(`/place/${placeId}`)
+}
+
+const shareProfile = async () => {
+
+  const link =
+    `${window.location.origin}/profile/${profileUserId.value}`
+
+  await navigator.clipboard.writeText(link)
+
+  alert("คัดลอกลิงก์โปรไฟล์แล้ว")
+}
+
+/* LOAD ALL */
+
+const loadAll = async () => {
+
+  try {
+
+    await Promise.all([
+      loadProfile(),
+      loadFollowers(),
+      loadReviews(),
+      loadPlaces(),
+      loadFavorites(),
+      loadPhotos()
+    ])
+
+    loadActivity()
+
+  } catch (err) {
+
+    console.error("loadAll error", err)
+
   }
-};
 
-const shareProfile = () => {
-  const profileLink = `${window.location.origin}/profile/${profileUserId.value}`;
+}
 
-  navigator.clipboard
-    .writeText(profileLink)
-    .then(() => alert("คัดลอกลิงก์โปรไฟล์เรียบร้อย!"));
-};
+/* LIFECYCLE */
 
-// ------------------- Lifecycle -------------------
 onMounted(() => {
-  currentUserId.value = localStorage.getItem("userId");
 
-  if (!route.params.userId) profileUserId.value = currentUserId.value;
+  currentUserId.value = localStorage.getItem("userId")
 
-  loadProfile();
-});
+  profileUserId.value =
+    route.params.userId || currentUserId.value
+
+  loadAll()
+
+})
 
 watch(
   () => route.params.userId,
   (newId) => {
-    profileUserId.value = newId || currentUserId.value;
-    loadProfile();
-  },
-);
+
+    profileUserId.value =
+      newId || currentUserId.value
+
+    loadAll()
+
+  }
+)
 </script>
 
 <style scoped>

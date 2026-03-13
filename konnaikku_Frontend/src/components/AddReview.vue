@@ -106,7 +106,7 @@ const submitReview = async () => {
 
     const formData = new FormData()
 
-    formData.append("placeId", props.placeId)
+    formData.append("place_id", props.placeId)
     formData.append("comment", comment.value)
     formData.append("rating", rating.value)
 
@@ -114,12 +114,15 @@ const submitReview = async () => {
       formData.append("images", file)
     })
 
+    const token = localStorage.getItem("token")
+
     await axios.post(
       "http://localhost:8080/api/reviews",
       formData,
       {
-        headers: {
-          "Content-Type": "multipart/form-data"
+        headers:{
+          "Content-Type":"multipart/form-data",
+          Authorization:`Bearer ${token}`
         }
       }
     )
@@ -132,10 +135,14 @@ const submitReview = async () => {
     emit("reviewAdded")
 
   } catch (error) {
+
     console.error(error)
-    alert("เกิดข้อผิดพลาด")
+    alert("กรุณาเข้าสู่ระบบก่อนรีวิว")
+
   } finally {
+
     loading.value = false
+
   }
 }
 </script>
@@ -235,9 +242,12 @@ button:disabled {
   background: red;
   color: white;
   border: none;
-  border-radius: 50%;
+  border-radius: 4px;
   font-size: 12px;
   cursor: pointer;
+  margin-top: 8px;
+  margin-right: 6px;
+  padding: 0px 2px;
 }
 @media screen and (max-width: 768px) {
   textarea {
