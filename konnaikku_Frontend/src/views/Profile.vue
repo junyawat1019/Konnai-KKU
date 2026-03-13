@@ -189,7 +189,7 @@ import ReviewCard from "@/components/ReviewCard.vue"
 const router = useRouter()
 const route = useRoute()
 
-const API = "http://localhost:8080/api"
+const API = import.meta.env.VITE_API_URL
 
 /* USER ID */
 

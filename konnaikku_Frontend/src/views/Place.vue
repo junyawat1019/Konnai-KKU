@@ -90,6 +90,7 @@
     </div>
   </DefaultLayout>
 </template>
+
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
@@ -101,7 +102,7 @@ import PlaceCard from "@/components/PlaceCard.vue"
 const router = useRouter()
 const route = useRoute()
 
-const API = "http://localhost:8080/api"
+const API = import.meta.env.VITE_API_URL
 
 /* =====================
 STATE

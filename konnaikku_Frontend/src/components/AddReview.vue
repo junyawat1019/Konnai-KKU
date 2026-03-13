@@ -19,7 +19,7 @@
             @change="onFileChange"
             multiple
             accept="image/*"
-            style="display:none"
+            style="display: none"
           />
         </div>
 
@@ -44,107 +44,95 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
-import axios from "axios"
+import { ref } from "vue";
+import api from "@/services/api"
 
 const props = defineProps({
-  placeId: String
-})
+  placeId: String,
+});
 
-const emit = defineEmits(["reviewAdded"])
+const emit = defineEmits(["reviewAdded"]);
 
-const comment = ref("")
-const rating = ref(5)
-const imageFiles = ref([])
-const imagePreviews = ref([])
-const loading = ref(false)
-const fileInput = ref(null)
+const comment = ref("");
+const rating = ref(5);
+const imageFiles = ref([]);
+const imagePreviews = ref([]);
+const loading = ref(false);
+const fileInput = ref(null);
 
 const triggerFileInput = () => {
-  fileInput.value.click()
-}
+  fileInput.value.click();
+};
 
 const onFileChange = (e) => {
-  const files = Array.from(e.target.files)
+  const files = Array.from(e.target.files);
 
-  const validFiles = []
+  const validFiles = [];
 
   for (let file of files) {
-
     if (!file.type.startsWith("image/")) {
-      alert(`${file.name} ไม่ใช่ไฟล์ภาพ`)
-      continue
+      alert(`${file.name} ไม่ใช่ไฟล์ภาพ`);
+      continue;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert(`${file.name} เกิน 5MB`)
-      continue
+      alert(`${file.name} เกิน 5MB`);
+      continue;
     }
 
-    validFiles.push(file)
+    validFiles.push(file);
   }
 
-  imageFiles.value = validFiles
-  imagePreviews.value = validFiles.map(file => URL.createObjectURL(file))
-}
+  imageFiles.value = validFiles;
+  imagePreviews.value = validFiles.map((file) => URL.createObjectURL(file));
+};
 
 const removeImage = (index) => {
-  imageFiles.value.splice(index, 1)
-  imagePreviews.value.splice(index, 1)
-}
+  imageFiles.value.splice(index, 1);
+  imagePreviews.value.splice(index, 1);
+};
 
 const submitReview = async () => {
-
   if (!comment.value.trim()) {
-    alert("กรุณาใส่เนื้อหารีวิว")
-    return
+    alert("กรุณาใส่เนื้อหารีวิว");
+    return;
   }
 
-  loading.value = true
+  loading.value = true;
 
   try {
+    const formData = new FormData();
 
-    const formData = new FormData()
+    formData.append("place_id", props.placeId);
+    formData.append("comment", comment.value);
+    formData.append("rating", rating.value);
 
-    formData.append("place_id", props.placeId)
-    formData.append("comment", comment.value)
-    formData.append("rating", rating.value)
+    imageFiles.value.forEach((file) => {
+      formData.append("images", file);
+    });
 
-    imageFiles.value.forEach(file => {
-      formData.append("images", file)
-    })
+    const token = localStorage.getItem("token");
 
-    const token = localStorage.getItem("token")
+    await api.post("/reviews", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-    await axios.post(
-      "http://localhost:8080/api/reviews",
-      formData,
-      {
-        headers:{
-          "Content-Type":"multipart/form-data",
-          Authorization:`Bearer ${token}`
-        }
-      }
-    )
+    comment.value = "";
+    rating.value = 5;
+    imageFiles.value = [];
+    imagePreviews.value = [];
 
-    comment.value = ""
-    rating.value = 5
-    imageFiles.value = []
-    imagePreviews.value = []
-
-    emit("reviewAdded")
-
+    emit("reviewAdded");
   } catch (error) {
-
-    console.error(error)
-    alert("กรุณาเข้าสู่ระบบก่อนรีวิว")
-
+    console.error(error);
+    alert("กรุณาเข้าสู่ระบบก่อนรีวิว");
   } finally {
-
-    loading.value = false
-
+    loading.value = false;
   }
-}
+};
 </script>
 
 <style scoped>
@@ -173,7 +161,7 @@ textarea {
 }
 
 textarea:focus {
-  border-color: #007BFF;
+  border-color: #007bff;
   outline: none;
 }
 
@@ -198,7 +186,7 @@ select {
 }
 
 .image-upload button {
-  background: #007BFF;
+  background: #007bff;
   color: white;
   border: none;
   padding: 8px 14px;
@@ -206,7 +194,7 @@ select {
 }
 
 button[type="submit"] {
-  background: #007BFF;
+  background: #007bff;
   color: white;
   border: none;
   padding: 8px 14px;

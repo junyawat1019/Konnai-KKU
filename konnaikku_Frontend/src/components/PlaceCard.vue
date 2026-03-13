@@ -52,7 +52,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
 
-const API = "http://localhost:8080/api";
+const API = import.meta.env.VITE_API_URL;
 
 const router = useRouter();
 

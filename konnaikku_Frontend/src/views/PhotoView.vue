@@ -52,23 +52,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, onUnmounted } from "vue"
-import { useRoute, useRouter } from "vue-router"
-import axios from "axios"
+import { ref, onMounted, computed, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import axios from "axios";
 
-import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import DefaultLayout from "@/layouts/DefaultLayout.vue";
 
-const route = useRoute()
-const router = useRouter()
+const route = useRoute();
+const router = useRouter();
 
-const placeId = route.params.id
-const startIndex = Number(route.params.index) || 0
+const placeId = route.params.id;
+const startIndex = Number(route.params.index) || 0;
 
-const place = ref(null)
-const loading = ref(true)
+const place = ref(null);
+const loading = ref(true);
 
-const showLightbox = ref(false)
-const currentIndex = ref(startIndex)
+const showLightbox = ref(false);
+const currentIndex = ref(startIndex);
 
 /* =======================
    FETCH PLACE FROM API
@@ -76,58 +76,45 @@ const currentIndex = ref(startIndex)
 
 const fetchPlace = async () => {
   try {
-
     /* ---------- PLACE INFO ---------- */
+    const placeRes = await api.get(`/places/${placeId}`);
 
-    const placeRes = await axios.get(
-      `http://localhost:8080/api/places/${placeId}`
-    )
+    const imageRes = await api.get(`/places/${placeId}/images`);
 
-    /* ---------- IMAGES ---------- */
-
-    const imageRes = await axios.get(
-      `http://localhost:8080/api/places/${placeId}/images`
-    )
-
-    const imageUrls = imageRes.data.map(i => i.image_url)
+    const imageUrls = imageRes.data.map((i) => i.image_url);
 
     place.value = {
       id: placeRes.data.id,
       name: placeRes.data.name,
-      imageUrls
-    }
+      imageUrls,
+    };
 
     if (imageUrls.length && startIndex >= 0) {
-      showLightbox.value = true
+      showLightbox.value = true;
     }
-
   } catch (error) {
-
-    console.error("Fetch place error:", error)
-
+    console.error("Fetch place error:", error);
   } finally {
-
-    loading.value = false
-
+    loading.value = false;
   }
-}
+};
 
 /* =======================
    NAVIGATION
 ======================= */
 
 const goBack = () => {
-  router.back()
-}
+  router.back();
+};
 
 const openLightbox = (index) => {
-  currentIndex.value = index
-  showLightbox.value = true
-}
+  currentIndex.value = index;
+  showLightbox.value = true;
+};
 
 const closeLightbox = () => {
-  showLightbox.value = false
-}
+  showLightbox.value = false;
+};
 
 /* =======================
    IMAGE CONTROL
@@ -135,58 +122,49 @@ const closeLightbox = () => {
 
 const prevImage = () => {
   if (currentIndex.value > 0) {
-    currentIndex.value--
+    currentIndex.value--;
   }
-}
+};
 
 const nextImage = () => {
   if (currentIndex.value < place.value.imageUrls.length - 1) {
-    currentIndex.value++
+    currentIndex.value++;
   }
-}
+};
 
 const currentImage = computed(
-  () => place.value?.imageUrls?.[currentIndex.value]
-)
+  () => place.value?.imageUrls?.[currentIndex.value],
+);
 
-const hasPrev = computed(
-  () => currentIndex.value > 0
-)
+const hasPrev = computed(() => currentIndex.value > 0);
 
 const hasNext = computed(
-  () =>
-    currentIndex.value <
-    (place.value?.imageUrls?.length || 0) - 1
-)
+  () => currentIndex.value < (place.value?.imageUrls?.length || 0) - 1,
+);
 
 /* =======================
    KEYBOARD CONTROL
 ======================= */
 
 const handleKey = (e) => {
+  if (!showLightbox.value) return;
 
-  if (!showLightbox.value) return
+  if (e.key === "ArrowLeft") prevImage();
 
-  if (e.key === "ArrowLeft") prevImage()
+  if (e.key === "ArrowRight") nextImage();
 
-  if (e.key === "ArrowRight") nextImage()
-
-  if (e.key === "Escape") closeLightbox()
-}
+  if (e.key === "Escape") closeLightbox();
+};
 
 onMounted(() => {
+  fetchPlace();
 
-  fetchPlace()
-
-  window.addEventListener("keydown", handleKey)
-
-})
+  window.addEventListener("keydown", handleKey);
+});
 
 onUnmounted(() => {
-
-  window.removeEventListener("keydown", handleKey)
-
-})
+  window.removeEventListener("keydown", handleKey);
+});
 </script>
 
 <style scoped>

@@ -25,30 +25,29 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
-import axios from "axios"
-import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import { ref } from "vue";
+import api from "@/services/api"
+import DefaultLayout from "@/layouts/DefaultLayout.vue";
 
-const email = ref("")
-const loading = ref(false)
+const email = ref("");
+const loading = ref(false);
 
 const resetPassword = async () => {
-  loading.value = true
+  loading.value = true;
 
   try {
-    await axios.post("http://localhost:8080/api/auth/reset-password", {
-      email: email.value
-    })
+    await api.post("/auth/reset-password", {
+      email: email.value,
+    });
 
-    alert("ส่งลิงก์รีเซ็ตรหัสผ่านเรียบร้อยแล้ว")
-    email.value = ""
-
+    alert("ส่งลิงก์รีเซ็ตรหัสผ่านเรียบร้อยแล้ว");
+    email.value = "";
   } catch (error) {
-    alert(error.response?.data?.message || "เกิดข้อผิดพลาด")
+    alert(error.response?.data?.message || "เกิดข้อผิดพลาด");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 </script>
 
 <style scoped>

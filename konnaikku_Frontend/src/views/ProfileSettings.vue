@@ -156,7 +156,7 @@ import axios from "axios"
 import DefaultLayout from "@/layouts/DefaultLayout.vue"
 import defaultAvatarImage from "@/assets/images/default-avatar.png"
 
-const API = "http://localhost:8080/api"
+const API = import.meta.env.VITE_API_URL
 
 const token = localStorage.getItem("token")
 
